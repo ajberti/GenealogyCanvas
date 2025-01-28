@@ -7,16 +7,23 @@ import FamilyTree from "@/components/FamilyTree";
 import Timeline from "@/components/Timeline";
 import MemberForm from "@/components/MemberForm";
 import DocumentUpload from "@/components/DocumentUpload";
+import MemberProfile from "@/components/MemberProfile";
 import type { FamilyMember } from "@/lib/types";
 
 const VINTAGE_PAPER_BG = "https://images.unsplash.com/photo-1519972064555-542444e71b54";
 
 export default function Home() {
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+  const [showingProfile, setShowingProfile] = useState(false);
 
   const { data: members = [], isLoading } = useQuery<FamilyMember[]>({
     queryKey: ["/api/family-members"],
   });
+
+  const handleMemberClick = (member: FamilyMember) => {
+    setSelectedMember(member);
+    setShowingProfile(true);
+  };
 
   return (
     <div 
@@ -43,7 +50,7 @@ export default function Home() {
               <div className="h-[600px] border rounded-lg bg-white/50 p-4">
                 <FamilyTree
                   members={members}
-                  onSelectMember={setSelectedMember}
+                  onSelectMember={handleMemberClick}
                   isLoading={isLoading}
                 />
               </div>
@@ -53,7 +60,7 @@ export default function Home() {
               <div className="border rounded-lg bg-white/50">
                 <Timeline
                   members={members}
-                  onSelectMember={setSelectedMember}
+                  onSelectMember={handleMemberClick}
                   isLoading={isLoading}
                 />
               </div>
@@ -69,7 +76,7 @@ export default function Home() {
                         key={member.id}
                         variant="ghost"
                         className="w-full justify-start"
-                        onClick={() => setSelectedMember(member)}
+                        onClick={() => handleMemberClick(member)}
                       >
                         {member.firstName} {member.lastName}
                       </Button>
@@ -92,6 +99,11 @@ export default function Home() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <MemberProfile 
+        member={showingProfile ? selectedMember : null} 
+        onClose={() => setShowingProfile(false)} 
+      />
     </div>
   );
 }
