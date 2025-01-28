@@ -43,31 +43,38 @@ type FormValues = z.infer<typeof memberSchema>;
 interface MemberFormProps {
   member: FamilyMember | null;
   onClose: () => void;
-  existingMembers: FamilyMember[];
+  existingMembers?: FamilyMember[];
 }
 
-export default function MemberForm({ member, onClose, existingMembers }: MemberFormProps) {
+export default function MemberForm({ member, onClose, existingMembers = [] }: MemberFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const defaultValues = member
+    ? {
+        firstName: member.firstName,
+        lastName: member.lastName,
+        gender: member.gender,
+        birthPlace: member.birthPlace || "",
+        currentLocation: member.currentLocation || "",
+        bio: member.bio || "",
+        birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split("T")[0] : "",
+        deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split("T")[0] : "",
+      }
+    : {
+        firstName: "",
+        lastName: "",
+        gender: undefined,
+        birthPlace: "",
+        currentLocation: "",
+        bio: "",
+        birthDate: "",
+        deathDate: "",
+      };
+
   const form = useForm<FormValues>({
     resolver: zodResolver(memberSchema),
-    defaultValues: member
-      ? {
-          ...member,
-          birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split("T")[0] : "",
-          deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split("T")[0] : "",
-        }
-      : {
-          firstName: "",
-          lastName: "",
-          gender: undefined,
-          birthPlace: "",
-          currentLocation: "",
-          bio: "",
-          birthDate: "",
-          deathDate: "",
-        },
+    defaultValues,
   });
 
   const mutation = useMutation({
