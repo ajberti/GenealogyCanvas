@@ -155,12 +155,53 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
 
               <Card>
                 <CardContent className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Documents</h3>
-                  {member.documents && member.documents.length > 0 ? (
-                    <DocumentViewer documents={member.documents} />
-                  ) : (
-                    <p className="text-muted-foreground">No documents available</p>
-                  )}
+                  <h3 className="text-lg font-medium mb-4">Family Documents & Records</h3>
+                  <div className="space-y-4">
+                    {member.documents && member.documents.length > 0 ? (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {member.documents.map((doc) => (
+                            <div key={doc.id} className="p-4 border rounded-lg bg-card hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <h4 className="font-medium">{doc.title}</h4>
+                                  <p className="text-sm text-muted-foreground capitalize">
+                                    {doc.documentType}
+                                  </p>
+                                </div>
+                              </div>
+                              {doc.description && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                  {doc.description}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Added on {formatDate(new Date(doc.uploadDate))}
+                              </p>
+                              <div className="mt-3">
+                                <a
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                  View Document
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/*<DocumentViewer documents={member.documents} />*/}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No documents have been added yet.</p>
+                        <p className="text-sm mt-1">
+                          You can add documents from the Documents tab.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
