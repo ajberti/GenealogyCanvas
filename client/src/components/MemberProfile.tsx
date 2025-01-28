@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import type { FamilyMember } from "@/lib/types";
 import DocumentViewer from "./DocumentViewer";
+import StoryGenerator from "./StoryGenerator";
 
 interface MemberProfileProps {
   member: FamilyMember | null;
@@ -84,6 +85,9 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Story Generator */}
+            <StoryGenerator member={member} />
 
             {/* Documents Section */}
             <Card>

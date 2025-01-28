@@ -7,6 +7,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from 'express';
+import OpenAI from "openai";
+
+const openai = new OpenAI();
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -212,6 +215,72 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error seeding data:", error);
       res.status(500).json({ success: false, message: "Error seeding data" });
+    }
+  });
+
+  // Story Generation
+  app.post("/api/family-members/:id/story", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Fetch member with relationships
+      const member = await db.query.familyMembers.findFirst({
+        where: eq(familyMembers.id, parseInt(id)),
+        with: {
+          relationships: {
+            with: {
+              relatedPerson: true,
+            },
+          },
+        },
+      });
+
+      if (!member) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      // Prepare family context
+      const familyContext = member.relationships?.map(rel => {
+        const relation = rel.relationType;
+        const related = rel.relatedPerson;
+        return `${related?.firstName} ${related?.lastName} is their ${relation}`;
+      }).join(". ");
+
+      // Generate story prompt
+      const prompt = `Create a heartwarming and engaging family story about ${member.firstName} ${member.lastName}. 
+        Here are the key details about them:
+        - Born in ${member.birthPlace || "an unknown location"}
+        - Currently lives in ${member.currentLocation || "an unspecified location"}
+        - Family connections: ${familyContext || "No known family connections"}
+        - Additional information: ${member.bio || ""}
+
+        Please write a warm, personal narrative that weaves together these facts into a cohesive story 
+        about their life and family connections. Focus on significant life moments, family relationships, 
+        and the bonds that connect them to their relatives. Keep the tone respectful and focus on 
+        positive aspects of family relationships and life events.`;
+
+      // Generate story using OpenAI
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are a skilled family historian and storyteller, specializing in creating engaging narratives about family histories. Your stories are warm, personal, and focus on the connections between family members."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      const story = response.choices[0].message.content;
+      res.json({ story });
+    } catch (error) {
+      console.error('Story generation error:', error);
+      res.status(500).json({ message: "Failed to generate story" });
     }
   });
 
