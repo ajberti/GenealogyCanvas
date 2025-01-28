@@ -6,6 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -14,6 +22,23 @@ import {
 } from "@/components/ui/select";
 import type { FamilyMember } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const memberSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  gender: z.enum(["male", "female", "other"], {
+    required_error: "Please select a gender",
+  }),
+  birthDate: z.string().optional(),
+  deathDate: z.string().optional(),
+  birthPlace: z.string().optional(),
+  currentLocation: z.string().optional(),
+  bio: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof memberSchema>;
 
 interface MemberFormProps {
   member: FamilyMember | null;
@@ -21,36 +46,28 @@ interface MemberFormProps {
   existingMembers: FamilyMember[];
 }
 
-interface FormValues {
-  firstName: string;
-  lastName: string;
-  gender: string;
-  birthDate: string;
-  deathDate: string;
-  birthPlace?: string;
-  currentLocation?: string;
-  bio?: string;
-}
-
 export default function MemberForm({ member, onClose, existingMembers }: MemberFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { register, handleSubmit } = useForm<FormValues>({
-    defaultValues: member ? {
-      ...member,
-      birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split('T')[0] : '',
-      deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split('T')[0] : '',
-    } : {
-      firstName: "",
-      lastName: "",
-      gender: "",
-      birthPlace: "",
-      currentLocation: "",
-      bio: "",
-      birthDate: "",
-      deathDate: "",
-    },
+  const form = useForm<FormValues>({
+    resolver: zodResolver(memberSchema),
+    defaultValues: member
+      ? {
+          ...member,
+          birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split("T")[0] : "",
+          deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split("T")[0] : "",
+        }
+      : {
+          firstName: "",
+          lastName: "",
+          gender: undefined,
+          birthPlace: "",
+          currentLocation: "",
+          bio: "",
+          birthDate: "",
+          deathDate: "",
+        },
   });
 
   const mutation = useMutation({
@@ -61,9 +78,7 @@ export default function MemberForm({ member, onClose, existingMembers }: MemberF
         deathDate: data.deathDate ? new Date(data.deathDate) : null,
       };
 
-      const url = member 
-        ? `/api/family-members/${member.id}`
-        : "/api/family-members";
+      const url = member ? `/api/family-members/${member.id}` : "/api/family-members";
 
       const res = await fetch(url, {
         method: member ? "PUT" : "POST",
@@ -96,76 +111,142 @@ export default function MemberForm({ member, onClose, existingMembers }: MemberF
         </h3>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input id="firstName" {...register("firstName", { required: true })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input id="lastName" {...register("lastName", { required: true })} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="gender">Gender</Label>
-            <Select {...register("gender")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select gender" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">Male</SelectItem>
-                <SelectItem value="female">Female</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="birthDate">Birth Date</Label>
-              <Input 
-                id="birthDate" 
-                type="date" 
-                {...register("birthDate")} 
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="deathDate">Death Date</Label>
-              <Input 
-                id="deathDate" 
-                type="date" 
-                {...register("deathDate")} 
+
+            <FormField
+              control={form.control}
+              name="gender"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Gender</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="birthDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Birth Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="deathDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Death Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="birthPlace">Birth Place</Label>
-              <Input id="birthPlace" {...register("birthPlace")} />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="birthPlace"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Birth Place</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="currentLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current Location</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="currentLocation">Current Location</Label>
-              <Input id="currentLocation" {...register("currentLocation")} />
+
+            <FormField
+              control={form.control}
+              name="bio"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Biography</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={onClose} type="button">
+                Cancel
+              </Button>
+              <Button type="submit">
+                {member ? "Update" : "Add"} Member
+              </Button>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bio">Biography</Label>
-            <Textarea id="bio" {...register("bio")} />
-          </div>
-
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              {member ? "Update" : "Add"} Member
-            </Button>
-          </div>
-        </form>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );
