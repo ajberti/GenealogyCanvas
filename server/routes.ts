@@ -9,7 +9,7 @@ import OpenAI from "openai";
 const openai = new OpenAI();
 
 interface RelationshipInput {
-  toMemberId: string;
+  relatedPersonId: string;
   relationType: 'parent' | 'child' | 'spouse';
 }
 
@@ -65,7 +65,7 @@ export function registerRoutes(app: Express): Server {
       if (relationshipData && relationshipData.length > 0) {
         const relationshipsToInsert = relationshipData.map((rel: RelationshipInput) => ({
           fromMemberId: member.id,
-          toMemberId: parseInt(rel.toMemberId),
+          toMemberId: parseInt(rel.relatedPersonId),
           relationType: rel.relationType,
         }));
 
@@ -108,6 +108,7 @@ export function registerRoutes(app: Express): Server {
         ...memberData,
         birthDate: memberData.birthDate ? new Date(memberData.birthDate) : null,
         deathDate: memberData.deathDate ? new Date(memberData.deathDate) : null,
+        updatedAt: new Date(),
       };
 
       // Update member data
@@ -118,20 +119,24 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       // Handle relationships
-      if (newRelationships) {
+      if (Array.isArray(newRelationships)) {
         // Delete existing relationships
         await db.delete(relationships)
           .where(eq(relationships.fromMemberId, parseInt(id)));
 
         // Add new relationships if any
         if (newRelationships.length > 0) {
-          const relationshipsToInsert = newRelationships.map((rel: RelationshipInput) => ({
-            fromMemberId: member.id,
-            toMemberId: parseInt(rel.toMemberId),
-            relationType: rel.relationType,
-          }));
+          const relationshipsToInsert = newRelationships
+            .filter(rel => rel.relatedPersonId && !isNaN(parseInt(rel.relatedPersonId)))
+            .map(rel => ({
+              fromMemberId: member.id,
+              toMemberId: parseInt(rel.relatedPersonId),
+              relationType: rel.relationType,
+            }));
 
-          await db.insert(relationships).values(relationshipsToInsert);
+          if (relationshipsToInsert.length > 0) {
+            await db.insert(relationships).values(relationshipsToInsert);
+          }
         }
       }
 

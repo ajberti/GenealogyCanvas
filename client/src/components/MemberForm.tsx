@@ -118,6 +118,11 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         // Only format dates if they exist
         birthDate: data.birthDate ? data.birthDate : null,
         deathDate: data.deathDate ? data.deathDate : null,
+        relationships: data.relationships.map(rel => ({
+          ...rel,
+          // Ensure we're sending numeric IDs
+          relatedPersonId: rel.relatedPersonId ? String(rel.relatedPersonId) : undefined
+        })),
       };
 
       const url = member ? `/api/family-members/${member.id}` : "/api/family-members";
