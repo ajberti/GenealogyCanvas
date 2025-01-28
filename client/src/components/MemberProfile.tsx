@@ -128,9 +128,9 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                   </div>
 
                   {member.bio && (
-                    <div>
-                      <h3 className="font-medium text-muted-foreground">Biography</h3>
-                      <p className="mt-1 whitespace-pre-wrap">{member.bio}</p>
+                    <div className="mt-6">
+                      <h3 className="font-medium text-muted-foreground mb-2">Biography</h3>
+                      <p className="mt-1 whitespace-pre-wrap text-pretty">{member.bio}</p>
                     </div>
                   )}
 
