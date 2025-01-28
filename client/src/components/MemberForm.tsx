@@ -44,7 +44,20 @@ const memberSchema = z.object({
   birthPlace: z.string().optional(),
   currentLocation: z.string().optional(),
   bio: z.string().optional(),
-  relationships: z.array(relationSchema),
+  relationships: z.array(relationSchema).refine(
+    (relationships) => {
+      const seen = new Set();
+      return relationships.every((rel) => {
+        const key = `${rel.relatedPersonId}-${rel.relationType}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    },
+    {
+      message: "Duplicate relationships are not allowed",
+    }
+  ),
 });
 
 type FormValues = z.infer<typeof memberSchema>;

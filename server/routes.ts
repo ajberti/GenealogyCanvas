@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { familyMembers, relationships, documents } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -88,9 +88,28 @@ export function registerRoutes(app: Express): Server {
 
       // Add relationships if any
       if (relationshipData && relationshipData.length > 0) {
+        // Check for existing relationships
+        const existingRelationships = await db.query.relationships.findMany({
+          where: or(
+            and(
+              eq(relationships.personId, member.id),
+              eq(relationships.relationType, relationshipData[0].relationType)
+            ),
+            and(
+              eq(relationships.relatedPersonId, member.id),
+              eq(relationships.relationType, relationshipData[0].relationType === 'parent' ? 'child' :
+                                        relationshipData[0].relationType === 'child' ? 'parent' :
+                                        'spouse')
+            )
+          ),
+        });
+
+        if (existingRelationships.length > 0) {
+          return res.status(400).json({ message: "Duplicate relationships detected" });
+        }
+
         const relationshipsToInsert = relationshipData.flatMap(rel => {
           const relatedPersonId = parseInt(rel.relatedPersonId);
-          // Create bidirectional relationships
           return [
             {
               personId: member.id,
@@ -100,9 +119,9 @@ export function registerRoutes(app: Express): Server {
             {
               personId: relatedPersonId,
               relatedPersonId: member.id,
-              relationType: rel.relationType === 'parent' ? 'child' : 
-                          rel.relationType === 'child' ? 'parent' : 
-                          'spouse',
+              relationType: rel.relationType === 'parent' ? 'child' :
+                         rel.relationType === 'child' ? 'parent' :
+                         'spouse',
             }
           ];
         });
@@ -154,6 +173,19 @@ export function registerRoutes(app: Express): Server {
         await db.delete(relationships)
           .where(eq(relationships.personId, parseInt(id)));
 
+        // Check for duplicates in new relationships
+        const seen = new Set();
+        const hasDuplicates = newRelationships.some(rel => {
+          const key = `${rel.relatedPersonId}-${rel.relationType}`;
+          if (seen.has(key)) return true;
+          seen.add(key);
+          return false;
+        });
+
+        if (hasDuplicates) {
+          return res.status(400).json({ message: "Duplicate relationships detected" });
+        }
+
         // Add new relationships if any
         if (newRelationships.length > 0) {
           const relationshipsToInsert = newRelationships.flatMap(rel => {
@@ -167,8 +199,8 @@ export function registerRoutes(app: Express): Server {
               {
                 personId: relatedPersonId,
                 relatedPersonId: member.id,
-                relationType: rel.relationType === 'parent' ? 'child' : 
-                           rel.relationType === 'child' ? 'parent' : 
+                relationType: rel.relationType === 'parent' ? 'child' :
+                           rel.relationType === 'child' ? 'parent' :
                            'spouse',
               }
             ];
