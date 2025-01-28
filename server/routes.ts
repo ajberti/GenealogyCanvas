@@ -61,14 +61,14 @@ export function registerRoutes(app: Express): Server {
         },
       });
 
-      // Ensure dates are properly formatted
+      // Format dates safely
       const formattedMembers = members.map(member => ({
         ...member,
-        birthDate: member.birthDate ? new Date(member.birthDate).toISOString() : null,
-        deathDate: member.deathDate ? new Date(member.deathDate).toISOString() : null,
+        birthDate: member.birthDate ? member.birthDate.toISOString() : null,
+        deathDate: member.deathDate ? member.deathDate.toISOString() : null,
         documents: member.documents?.map(doc => ({
           ...doc,
-          uploadDate: doc.uploadDate ? new Date(doc.uploadDate).toISOString() : null,
+          uploadDate: doc.uploadDate ? doc.uploadDate.toISOString() : null,
         })),
       }));
 
@@ -85,19 +85,37 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.put("/api/family-members/:id", async (req, res) => {
-    const { id } = req.params;
-    const member = await db
-      .update(familyMembers)
-      .set(req.body)
-      .where(eq(familyMembers.id, parseInt(id)))
-      .returning();
-    res.json(member[0]);
+    try {
+      const { id } = req.params;
+      // Parse dates from the request body
+      const updateData = {
+        ...req.body,
+        birthDate: req.body.birthDate ? new Date(req.body.birthDate) : null,
+        deathDate: req.body.deathDate ? new Date(req.body.deathDate) : null,
+      };
+
+      const member = await db
+        .update(familyMembers)
+        .set(updateData)
+        .where(eq(familyMembers.id, parseInt(id)))
+        .returning();
+
+      res.json(member[0]);
+    } catch (error) {
+      console.error('Error updating family member:', error);
+      res.status(500).json({ message: "Failed to update family member" });
+    }
   });
 
   app.delete("/api/family-members/:id", async (req, res) => {
-    const { id } = req.params;
-    await db.delete(familyMembers).where(eq(familyMembers.id, parseInt(id)));
-    res.json({ success: true });
+    try {
+      const { id } = req.params;
+      await db.delete(familyMembers).where(eq(familyMembers.id, parseInt(id)));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting family member:', error);
+      res.status(500).json({ message: "Failed to delete family member" });
+    }
   });
 
   // Relationships
