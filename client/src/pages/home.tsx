@@ -1,8 +1,11 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus } from "lucide-react";
 import FamilyTree from "@/components/FamilyTree";
 import Timeline from "@/components/Timeline";
 import MemberForm from "@/components/MemberForm";
@@ -15,6 +18,7 @@ const VINTAGE_PAPER_BG = "https://images.unsplash.com/photo-1519972064555-542444
 export default function Home() {
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [showingProfile, setShowingProfile] = useState(false);
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
 
   const { data: members = [], isLoading } = useQuery<FamilyMember[]>({
     queryKey: ["/api/family-members"],
@@ -23,6 +27,11 @@ export default function Home() {
   const handleMemberClick = (member: FamilyMember) => {
     setSelectedMember(member);
     setShowingProfile(true);
+  };
+
+  const handleAddNewMember = () => {
+    setSelectedMember(null);
+    setShowAddMemberForm(true);
   };
 
   return (
@@ -67,28 +76,25 @@ export default function Home() {
             </TabsContent>
 
             <TabsContent value="members">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h2 className="text-2xl font-serif mb-4">Family Members</h2>
-                  <div className="space-y-2">
-                    {members.map((member) => (
-                      <Button
-                        key={member.id}
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => handleMemberClick(member)}
-                      >
-                        {member.firstName} {member.lastName}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <MemberForm
-                    member={selectedMember}
-                    onClose={() => setSelectedMember(null)}
-                    existingMembers={members}
-                  />
+              <div className="space-y-4">
+                <Button 
+                  onClick={handleAddNewMember} 
+                  className="w-full bg-primary hover:bg-primary/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Member
+                </Button>
+                <div className="space-y-2">
+                  {members.map((member) => (
+                    <Button
+                      key={member.id}
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => handleMemberClick(member)}
+                    >
+                      {member.firstName} {member.lastName}
+                    </Button>
+                  ))}
                 </div>
               </div>
             </TabsContent>
@@ -104,6 +110,21 @@ export default function Home() {
         member={showingProfile ? selectedMember : null} 
         onClose={() => setShowingProfile(false)} 
       />
+
+      {showAddMemberForm && (
+        <Dialog open={showAddMemberForm} onOpenChange={setShowAddMemberForm}>
+          <DialogContent className="max-w-3xl h-[90vh]">
+            <DialogTitle>Add New Member</DialogTitle>
+            <ScrollArea className="h-[calc(90vh-80px)] pr-4">
+              <MemberForm
+                member={null}
+                onClose={() => setShowAddMemberForm(false)}
+                existingMembers={members}
+              />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
