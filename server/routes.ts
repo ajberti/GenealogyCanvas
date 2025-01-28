@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { familyMembers, relationships, documents } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -80,41 +80,98 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/family-members", async (req, res) => {
-    const member = await db.insert(familyMembers).values(req.body).returning();
-    res.json(member[0]);
+    try {
+      const { relationships: relationshipData, ...memberData } = req.body;
+
+      // Insert the member first
+      const [member] = await db.insert(familyMembers).values(memberData).returning();
+
+      // Add relationships if any
+      if (relationshipData && relationshipData.length > 0) {
+        const relationshipsToInsert = relationshipData.flatMap(rel => {
+          const relatedPersonId = parseInt(rel.relatedPersonId);
+          // Create bidirectional relationships
+          return [
+            {
+              personId: member.id,
+              relatedPersonId,
+              relationType: rel.relationType,
+            },
+            {
+              personId: relatedPersonId,
+              relatedPersonId: member.id,
+              relationType: rel.relationType === 'parent' ? 'child' : 
+                          rel.relationType === 'child' ? 'parent' : 
+                          'spouse',
+            }
+          ];
+        });
+
+        await db.insert(relationships).values(relationshipsToInsert);
+      }
+
+      // Fetch the complete member data with relationships
+      const newMember = await db.query.familyMembers.findFirst({
+        where: eq(familyMembers.id, member.id),
+        with: {
+          relationships: {
+            with: {
+              relatedPerson: true,
+            },
+          },
+        },
+      });
+
+      res.json(newMember);
+    } catch (error) {
+      console.error('Error creating family member:', error);
+      res.status(500).json({ message: "Failed to create family member" });
+    }
   });
 
   app.put("/api/family-members/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      const { relationships: newRelationships, ...memberData } = req.body;
 
-      // First, fetch the existing member to preserve relationships
-      const existingMember = await db.query.familyMembers.findFirst({
-        where: eq(familyMembers.id, parseInt(id)),
-        with: {
-          relationships: true,
-        },
-      });
-
-      if (!existingMember) {
-        return res.status(404).json({ message: "Member not found" });
-      }
-
-      // Parse dates from the request body
-      const updateData = {
-        ...req.body,
-        birthDate: req.body.birthDate ? new Date(req.body.birthDate) : null,
-        deathDate: req.body.deathDate ? new Date(req.body.deathDate) : null,
-      };
-
-      // Update the member while preserving relationships
-      const member = await db
+      // Update member data
+      const [member] = await db
         .update(familyMembers)
-        .set(updateData)
+        .set(memberData)
         .where(eq(familyMembers.id, parseInt(id)))
         .returning();
 
-      // Fetch the updated member with all relationships
+      // Handle relationships
+      if (newRelationships) {
+        // Delete existing relationships
+        await db.delete(relationships)
+          .where(eq(relationships.personId, parseInt(id)));
+
+        // Add new relationships if any
+        if (newRelationships.length > 0) {
+          const relationshipsToInsert = newRelationships.flatMap(rel => {
+            const relatedPersonId = parseInt(rel.relatedPersonId);
+            return [
+              {
+                personId: member.id,
+                relatedPersonId,
+                relationType: rel.relationType,
+              },
+              {
+                personId: relatedPersonId,
+                relatedPersonId: member.id,
+                relationType: rel.relationType === 'parent' ? 'child' : 
+                            rel.relationType === 'child' ? 'parent' : 
+                            'spouse',
+              }
+            ];
+          });
+
+          await db.insert(relationships).values(relationshipsToInsert);
+        }
+      }
+
+      // Fetch updated member with relationships
       const updatedMember = await db.query.familyMembers.findFirst({
         where: eq(familyMembers.id, parseInt(id)),
         with: {

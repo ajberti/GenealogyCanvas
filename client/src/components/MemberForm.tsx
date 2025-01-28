@@ -24,6 +24,14 @@ import type { FamilyMember } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Plus, Trash2 } from "lucide-react";
+
+const relationSchema = z.object({
+  relatedPersonId: z.string().min(1, "Please select a family member"),
+  relationType: z.enum(["parent", "child", "spouse"], {
+    required_error: "Please select a relationship type",
+  }),
+});
 
 const memberSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -36,6 +44,7 @@ const memberSchema = z.object({
   birthPlace: z.string().optional(),
   currentLocation: z.string().optional(),
   bio: z.string().optional(),
+  relationships: z.array(relationSchema),
 });
 
 type FormValues = z.infer<typeof memberSchema>;
@@ -50,6 +59,11 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const currentRelationships = member?.relationships?.map(rel => ({
+    relatedPersonId: String(rel.relatedPersonId),
+    relationType: rel.relationType,
+  })) || [];
+
   const defaultValues = member
     ? {
         firstName: member.firstName,
@@ -60,6 +74,7 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         bio: member.bio || "",
         birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split("T")[0] : "",
         deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split("T")[0] : "",
+        relationships: currentRelationships,
       }
     : {
         firstName: "",
@@ -70,11 +85,17 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         bio: "",
         birthDate: "",
         deathDate: "",
+        relationships: [],
       };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(memberSchema),
     defaultValues,
+  });
+
+  const { fields, append, remove } = form.useFieldArray({
+    name: "relationships",
+    control: form.control,
   });
 
   const mutation = useMutation({
@@ -109,6 +130,9 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
   const onSubmit = (data: FormValues) => {
     mutation.mutate(data);
   };
+
+  // Filter out the current member from relationship options
+  const availableMembers = existingMembers.filter(m => m.id !== member?.id);
 
   return (
     <Card className="p-4">
@@ -243,6 +267,83 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
                 </FormItem>
               )}
             />
+
+            {/* Relationships Section */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label>Family Relationships</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ relatedPersonId: "", relationType: undefined })}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Relationship
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex gap-4 items-start">
+                    <FormField
+                      control={form.control}
+                      name={`relationships.${index}.relationType`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="parent">Parent</SelectItem>
+                              <SelectItem value="child">Child</SelectItem>
+                              <SelectItem value="spouse">Spouse</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`relationships.${index}.relatedPersonId`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select person" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {availableMembers.map((m) => (
+                                <SelectItem key={m.id} value={String(m.id)}>
+                                  {m.firstName} {m.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={onClose} type="button">
