@@ -2,7 +2,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
 import { Edit2, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -21,11 +20,18 @@ import DocumentViewer from "./DocumentViewer";
 import StoryGenerator from "./StoryGenerator";
 import MemberForm from "./MemberForm";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface MemberProfileProps {
   member: FamilyMember | null;
   onClose: () => void;
 }
+
+// Move formatDate outside component to avoid hook ordering issues
+const formatDate = (date: Date | undefined) => {
+  if (!date) return 'Not specified';
+  return format(new Date(date), 'MMMM d, yyyy');
+};
 
 export default function MemberProfile({ member, onClose }: MemberProfileProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -33,15 +39,9 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  if (!member) return null;
-
-  const formatDate = (date: Date | undefined) => {
-    if (!date) return 'Not specified';
-    return format(new Date(date), 'MMMM d, yyyy');
-  };
-
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      if (!member) throw new Error("No member selected");
       const res = await fetch(`/api/family-members/${member.id}`, {
         method: "DELETE",
       });
@@ -63,9 +63,12 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
     setShowDeleteDialog(false);
   };
 
+  // Early return after all hooks are defined
+  if (!member) return null;
+
   return (
     <>
-      <Dialog open={!!member} onOpenChange={() => onClose()}>
+      <Dialog open={true} onOpenChange={() => onClose()}>
         <DialogContent className="max-w-3xl h-[90vh]">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle className="text-2xl font-serif">
