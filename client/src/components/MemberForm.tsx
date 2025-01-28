@@ -39,8 +39,8 @@ const memberSchema = z.object({
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select a gender",
   }),
-  birthDate: z.string().optional(),
-  deathDate: z.string().optional(),
+  birthDate: z.string().optional().nullable(),
+  deathDate: z.string().optional().nullable(),
   birthPlace: z.string().optional(),
   currentLocation: z.string().optional(),
   bio: z.string().optional(),
@@ -72,8 +72,8 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         birthPlace: member.birthPlace || "",
         currentLocation: member.currentLocation || "",
         bio: member.bio || "",
-        birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split("T")[0] : "",
-        deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split("T")[0] : "",
+        birthDate: member.birthDate ? new Date(member.birthDate).toISOString().split("T")[0] : null,
+        deathDate: member.deathDate ? new Date(member.deathDate).toISOString().split("T")[0] : null,
         relationships: currentRelationships,
       }
     : {
@@ -83,8 +83,8 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         birthPlace: "",
         currentLocation: "",
         bio: "",
-        birthDate: "",
-        deathDate: "",
+        birthDate: null,
+        deathDate: null,
         relationships: [],
       };
 
@@ -215,7 +215,12 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
                   <FormItem>
                     <FormLabel>Birth Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input 
+                        type="date" 
+                        {...field} 
+                        value={field.value || ""} 
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -228,7 +233,12 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
                   <FormItem>
                     <FormLabel>Death Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input 
+                        type="date" 
+                        {...field} 
+                        value={field.value || ""} 
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
