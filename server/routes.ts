@@ -134,10 +134,17 @@ export function registerRoutes(app: Express): Server {
       const { id } = req.params;
       const { relationships: newRelationships, ...memberData } = req.body;
 
+      // Format dates properly for database
+      const formattedMemberData = {
+        ...memberData,
+        birthDate: memberData.birthDate ? new Date(memberData.birthDate) : null,
+        deathDate: memberData.deathDate ? new Date(memberData.deathDate) : null,
+      };
+
       // Update member data
       const [member] = await db
         .update(familyMembers)
-        .set(memberData)
+        .set(formattedMemberData)
         .where(eq(familyMembers.id, parseInt(id)))
         .returning();
 
@@ -161,8 +168,8 @@ export function registerRoutes(app: Express): Server {
                 personId: relatedPersonId,
                 relatedPersonId: member.id,
                 relationType: rel.relationType === 'parent' ? 'child' : 
-                            rel.relationType === 'child' ? 'parent' : 
-                            'spouse',
+                           rel.relationType === 'child' ? 'parent' : 
+                           'spouse',
               }
             ];
           });

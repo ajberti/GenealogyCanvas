@@ -102,8 +102,9 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
     mutationFn: async (data: FormValues) => {
       const formattedData = {
         ...data,
-        birthDate: data.birthDate ? new Date(data.birthDate).toISOString() : null,
-        deathDate: data.deathDate ? new Date(data.deathDate).toISOString() : null,
+        // Only format dates if they exist
+        birthDate: data.birthDate ? data.birthDate : null,
+        deathDate: data.deathDate ? data.deathDate : null,
       };
 
       const url = member ? `/api/family-members/${member.id}` : "/api/family-members";
@@ -130,6 +131,7 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
       onClose();
     },
     onError: (error) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message,
@@ -215,10 +217,10 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
                   <FormItem>
                     <FormLabel>Birth Date</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="date" 
-                        {...field} 
-                        value={field.value || ""} 
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value || null)}
                       />
                     </FormControl>
@@ -233,10 +235,10 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
                   <FormItem>
                     <FormLabel>Death Date</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="date" 
-                        {...field} 
-                        value={field.value || ""} 
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ""}
                         onChange={(e) => field.onChange(e.target.value || null)}
                       />
                     </FormControl>
