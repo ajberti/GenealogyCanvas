@@ -87,6 +87,19 @@ export function registerRoutes(app: Express): Server {
   app.put("/api/family-members/:id", async (req, res) => {
     try {
       const { id } = req.params;
+
+      // First, fetch the existing member to preserve relationships
+      const existingMember = await db.query.familyMembers.findFirst({
+        where: eq(familyMembers.id, parseInt(id)),
+        with: {
+          relationships: true,
+        },
+      });
+
+      if (!existingMember) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
       // Parse dates from the request body
       const updateData = {
         ...req.body,
@@ -94,13 +107,27 @@ export function registerRoutes(app: Express): Server {
         deathDate: req.body.deathDate ? new Date(req.body.deathDate) : null,
       };
 
+      // Update the member while preserving relationships
       const member = await db
         .update(familyMembers)
         .set(updateData)
         .where(eq(familyMembers.id, parseInt(id)))
         .returning();
 
-      res.json(member[0]);
+      // Fetch the updated member with all relationships
+      const updatedMember = await db.query.familyMembers.findFirst({
+        where: eq(familyMembers.id, parseInt(id)),
+        with: {
+          relationships: {
+            with: {
+              relatedPerson: true,
+            },
+          },
+          documents: true,
+        },
+      });
+
+      res.json(updatedMember);
     } catch (error) {
       console.error('Error updating family member:', error);
       res.status(500).json({ message: "Failed to update family member" });
