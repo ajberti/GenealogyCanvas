@@ -6,6 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -25,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 const relationSchema = z.object({
   relatedPersonId: z.string().min(1, "Please select a family member"),
@@ -71,6 +82,7 @@ interface MemberFormProps {
 export default function MemberForm({ member, onClose, existingMembers = [] }: MemberFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const currentRelationships = member?.relationships?.map(rel => ({
     relatedPersonId: String(rel.relatedPersonId),
@@ -115,12 +127,10 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
     mutationFn: async (data: FormValues) => {
       const formattedData = {
         ...data,
-        // Only format dates if they exist
         birthDate: data.birthDate ? data.birthDate : null,
         deathDate: data.deathDate ? data.deathDate : null,
         relationships: data.relationships.map(rel => ({
           ...rel,
-          // Ensure we're sending numeric IDs
           relatedPersonId: rel.relatedPersonId ? String(rel.relatedPersonId) : undefined
         })),
       };
@@ -158,245 +168,312 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/family-members/${member?.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to delete member");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family-members"] });
+      toast({
+        title: "Family member deleted",
+        description: "The family member has been removed from the tree",
+      });
+      onClose();
+    },
+    onError: (error) => {
+      console.error('Delete error:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: FormValues) => {
     mutation.mutate(data);
   };
 
-  // Filter out the current member from relationship options
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
+
   const availableMembers = existingMembers.filter(m => m.id !== member?.id);
 
   return (
-    <Card className="p-4">
-      <CardHeader>
-        <h3 className="text-2xl font-serif">
-          {member ? "Edit Family Member" : "Add New Member"}
-        </h3>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+    <>
+      <Card className="p-4">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <h3 className="text-2xl font-serif">
+              {member ? "Edit Family Member" : "Add New Member"}
+            </h3>
+            {member && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Member
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
-                name="firstName"
+                name="gender"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>Gender</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="birthDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Birth Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value || null)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="deathDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Death Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value || null)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="birthPlace"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Birth Place</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="currentLocation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Location</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="bio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Biography</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Textarea {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gender</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* Relationships Section */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Family Relationships</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ relatedPersonId: "", relationType: "parent" as const })}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Relationship
+                  </Button>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="birthDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Birth Date</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value || null)}
+                <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="flex gap-4 items-start">
+                      <FormField
+                        control={form.control}
+                        name={`relationships.${index}.relationType`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="parent">Parent</SelectItem>
+                                <SelectItem value="child">Child</SelectItem>
+                                <SelectItem value="spouse">Spouse</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="deathDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Death Date</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value || null)}
+
+                      <FormField
+                        control={form.control}
+                        name={`relationships.${index}.relatedPersonId`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select person" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableMembers.map((m) => (
+                                  <SelectItem key={m.id} value={String(m.id)}>
+                                    {m.firstName} {m.lastName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="birthPlace"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Birth Place</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="currentLocation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Current Location</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <FormField
-              control={form.control}
-              name="bio"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Biography</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Relationships Section */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label>Family Relationships</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append({ relatedPersonId: "", relationType: "parent" as const })}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Relationship
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={onClose} type="button">
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {member ? "Update" : "Add"} Member
                 </Button>
               </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
 
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-4 items-start">
-                    <FormField
-                      control={form.control}
-                      name={`relationships.${index}.relationType`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="parent">Parent</SelectItem>
-                              <SelectItem value="child">Child</SelectItem>
-                              <SelectItem value="spouse">Spouse</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`relationships.${index}.relatedPersonId`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select person" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {availableMembers.map((m) => (
-                                <SelectItem key={m.id} value={String(m.id)}>
-                                  {m.firstName} {m.lastName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => remove(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={onClose} type="button">
-                Cancel
-              </Button>
-              <Button type="submit">
-                {member ? "Update" : "Add"} Member
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {member?.firstName} {member?.lastName} and all their relationships from the family tree.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -418,5 +418,21 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add family member deletion endpoint
+  app.delete("/api/family-members/:id", async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+
+      // Delete the member (cascade deletion will handle relationships)
+      await db.delete(familyMembers)
+        .where(eq(familyMembers.id, memberId));
+
+      res.json({ success: true, message: "Family member deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting family member:', error);
+      res.status(500).json({ message: "Failed to delete family member" });
+    }
+  });
+
   return httpServer;
 }
