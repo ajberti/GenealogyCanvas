@@ -29,6 +29,7 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
 
         <ScrollArea className="flex-1">
           <div className="space-y-6 p-4">
+            {/* Basic Information */}
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -76,19 +77,25 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                         {rel.relatedPerson?.firstName} {rel.relatedPerson?.lastName}
                       </div>
                     ))}
+                    {(!member.relationships || member.relationships.length === 0) && (
+                      <p className="text-sm text-muted-foreground">No relationships recorded</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {member.documents && member.documents.length > 0 && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-medium mb-4">Documents</h3>
+            {/* Documents Section */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-medium mb-4">Documents</h3>
+                {member.documents && member.documents.length > 0 ? (
                   <DocumentViewer documents={member.documents} />
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <p className="text-muted-foreground">No documents available</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </ScrollArea>
       </DialogContent>
