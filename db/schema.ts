@@ -35,26 +35,16 @@ export const documents = pgTable("documents", {
 });
 
 export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
-  relationships: many(relationships, {
-    relationName: "memberRelationships",
-    fields: [familyMembers.id],
-    references: [relationships.personId],
-  }),
-  documents: many(documents, {
-    relationName: "memberDocuments",
-    fields: [familyMembers.id],
-    references: [documents.familyMemberId],
-  }),
+  relationships: many(relationships),
+  documents: many(documents),
 }));
 
 export const relationshipRelations = relations(relationships, ({ one }) => ({
   person: one(familyMembers, {
-    relationName: "memberRelationships",
     fields: [relationships.personId],
     references: [familyMembers.id],
   }),
   relatedPerson: one(familyMembers, {
-    relationName: "relatedMemberRelationships",
     fields: [relationships.relatedPersonId],
     references: [familyMembers.id],
   }),
@@ -62,7 +52,6 @@ export const relationshipRelations = relations(relationships, ({ one }) => ({
 
 export const documentRelations = relations(documents, ({ one }) => ({
   familyMember: one(familyMembers, {
-    relationName: "memberDocuments",
     fields: [documents.familyMemberId],
     references: [familyMembers.id],
   }),
