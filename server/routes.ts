@@ -56,14 +56,19 @@ export function registerRoutes(app: Express): Server {
   // Add family member
   app.post("/api/family-members", async (req, res) => {
     try {
-      const { relationships, ...memberData } = req.body;
+      const { relationships, birthDate, deathDate, ...memberData } = req.body;
 
-      // Insert the new family member
-      const [member] = await db.insert(familyMembers).values({
+      // Convert string dates to Date objects for database insertion
+      const formattedData = {
         ...memberData,
+        birthDate: birthDate ? new Date(birthDate) : null,
+        deathDate: deathDate ? new Date(deathDate) : null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      }).returning();
+      };
+
+      // Insert the new family member
+      const [member] = await db.insert(familyMembers).values(formattedData).returning();
 
       // If there are relationships, add them
       if (relationships && relationships.length > 0) {
