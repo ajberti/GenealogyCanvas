@@ -10,6 +10,7 @@ export interface FamilyMember {
   bio?: string;
   relationships?: Relationship[];
   timelineEvents?: TimelineEvent[];
+  documents?: Document[];
 }
 
 export interface Relationship {

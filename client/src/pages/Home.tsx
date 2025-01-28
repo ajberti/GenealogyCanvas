@@ -3,6 +3,7 @@ import { useState } from "react";
 import Timeline from "@/components/Timeline";
 import FamilyTree from "@/components/FamilyTree";
 import MemberForm from "@/components/MemberForm";
+import DocumentUpload from "@/components/DocumentUpload";
 import type { FamilyMember } from "@/lib/types";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -82,9 +83,7 @@ export default function Home() {
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-4">
-          <div className="text-center py-8 text-muted-foreground">
-            Document management feature coming soon.
-          </div>
+          <DocumentUpload members={members} />
         </TabsContent>
       </Tabs>
 
