@@ -27,7 +27,6 @@ interface MemberProfileProps {
   onClose: () => void;
 }
 
-// Move formatDate outside component to avoid hook ordering issues
 const formatDate = (date: Date | undefined) => {
   if (!date) return 'Not specified';
   return format(new Date(date), 'MMMM d, yyyy');
@@ -39,7 +38,6 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Get all family members for the relationships dropdown
   const { data: familyMembers = [] } = useQuery<FamilyMember[]>({
     queryKey: ["/api/family-members"],
   });
@@ -68,7 +66,6 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
     setShowDeleteDialog(false);
   };
 
-  // Early return after all hooks are defined
   if (!member) return null;
 
   return (
@@ -99,7 +96,6 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
 
           <ScrollArea className="h-[calc(90vh-80px)] pr-4">
             <div className="space-y-6">
-              {/* Basic Information */}
               <Card>
                 <CardContent className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -155,10 +151,8 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                 </CardContent>
               </Card>
 
-              {/* Story Generator */}
               <StoryGenerator member={member} />
 
-              {/* Documents Section */}
               <Card>
                 <CardContent className="p-6">
                   <h3 className="text-lg font-medium mb-4">Documents</h3>
@@ -174,13 +168,12 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete {member.firstName} {member.lastName} 
+              This action cannot be undone. This will permanently delete {member.firstName} {member.lastName}
               and all associated data from the family tree.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -196,18 +189,19 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Dialog */}
       {showEditDialog && (
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="max-w-3xl">
-            <MemberForm
-              member={member}
-              onClose={() => {
-                setShowEditDialog(false);
-                onClose();
-              }}
-              existingMembers={familyMembers}
-            />
+          <DialogContent className="max-w-3xl h-[90vh]">
+            <ScrollArea className="h-[calc(90vh-40px)]">
+              <MemberForm
+                member={member}
+                onClose={() => {
+                  setShowEditDialog(false);
+                  onClose();
+                }}
+                existingMembers={familyMembers}
+              />
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       )}
