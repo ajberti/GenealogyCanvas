@@ -3,6 +3,7 @@ import * as d3 from "d3";
 import type { TreeNode, FamilyMember } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface FamilyTreeProps {
   members: FamilyMember[];
@@ -21,8 +22,9 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
   useEffect(() => {
     if (!svgRef.current || isLoading || members.length === 0) return;
 
-    const width = svgRef.current.clientWidth;
-    const height = svgRef.current.clientHeight;
+    // Set fixed dimensions for the tree
+    const width = 1200; // Fixed width for the SVG
+    const height = 800; // Fixed height for the SVG
 
     // Transform data into hierarchical structure
     const buildTree = (members: FamilyMember[]): TreeNode => {
@@ -64,6 +66,8 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
     d3.select(svgRef.current).selectAll("*").remove();
 
     const svg = d3.select(svgRef.current)
+      .attr("width", width)
+      .attr("height", height)
       .append("g")
       .attr("transform", `translate(${width/2},50)`);
 
@@ -95,9 +99,8 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .join("path")
       .attr("class", "spouse-link")
       .attr("d", (d: D3TreeNode) => {
-        // Create a horizontal line between spouses
         const startX = d.x;
-        const endX = d.x + 80; // Spouse offset
+        const endX = d.x + 80;
         const y = d.y;
         return `M${startX},${y} L${endX},${y}`;
       })
@@ -161,10 +164,15 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
   }
 
   return (
-    <svg
-      ref={svgRef}
-      className="w-full h-full"
-      style={{ overflow: "visible" }}
-    />
+    <Card className="w-full h-[600px]">
+      <ScrollArea className="h-full w-full rounded-md">
+        <div className="relative w-full h-full min-w-[1200px] min-h-[800px]">
+          <svg
+            ref={svgRef}
+            className="absolute inset-0"
+          />
+        </div>
+      </ScrollArea>
+    </Card>
   );
 }
