@@ -22,14 +22,12 @@ export const relationships = pgTable("relationships", {
   relatedPersonId: integer("related_person_id").notNull().references(() => familyMembers.id, { onDelete: 'cascade' }),
   relationType: text("relation_type").notNull(),
   createdAt: timestamp("created_at").default(sql`NOW()`),
-}, (table) => {
-  return {
-    // Ensure unique combinations of personId and relatedPersonId for each relation type
-    uniqueIdx: uniqueIndex("unique_relationship_idx").on(table.personId, table.relatedPersonId, table.relationType),
-    // Prevent self-relationships with a simple CHECK constraint
-    selfRelationCheck: sql`CONSTRAINT prevent_self_relation CHECK (person_id <> related_person_id)`,
-  };
-});
+}, (table) => ({
+  // Ensure unique combinations of personId and relatedPersonId for each relation type
+  uniqueIdx: uniqueIndex("unique_relationship_idx").on(table.personId, table.relatedPersonId, table.relationType),
+  // Strengthen the self-relationship prevention with an explicit inequality check
+  selfRelationCheck: sql`CONSTRAINT prevent_self_relation CHECK ((person_id <> related_person_id) IS TRUE)`,
+}));
 
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
@@ -41,6 +39,7 @@ export const documents = pgTable("documents", {
   uploadDate: timestamp("upload_date").default(sql`NOW()`),
 });
 
+// Define relations
 export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
   relationships: many(relationships),
   documents: many(documents),
@@ -64,6 +63,7 @@ export const documentRelations = relations(documents, ({ one }) => ({
   }),
 }));
 
+// Export types and schemas
 export type FamilyMember = typeof familyMembers.$inferSelect;
 export type NewFamilyMember = typeof familyMembers.$inferInsert;
 export type Relationship = typeof relationships.$inferSelect;

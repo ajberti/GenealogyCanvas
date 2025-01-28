@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { familyMembers, relationships, documents } from "@db/schema";
+import { familyMembers, relationships, documents, type Relationship } from "@db/schema";
 import { eq, and, or } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -10,6 +10,11 @@ import express from 'express';
 import OpenAI from "openai";
 
 const openai = new OpenAI();
+
+interface RelationshipInput {
+  relatedPersonId: string;
+  relationType: 'parent' | 'child' | 'spouse';
+}
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -52,13 +57,27 @@ export function registerRoutes(app: Express): Server {
     try {
       const members = await db.query.familyMembers.findMany({
         with: {
+          documents: true,
+          // Explicitly specify the relationships we want
           relationships: {
             with: {
-              relatedPerson: true,
-            },
-          },
-          documents: true,
-        },
+              // Use the explicit relation name from schema
+              relatedPerson: {
+                columns: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  gender: true,
+                  birthDate: true,
+                  deathDate: true,
+                  birthPlace: true,
+                  currentLocation: true,
+                  bio: true
+                }
+              }
+            }
+          }
+        }
       });
 
       // Format dates safely
@@ -69,7 +88,7 @@ export function registerRoutes(app: Express): Server {
         documents: member.documents?.map(doc => ({
           ...doc,
           uploadDate: doc.uploadDate ? doc.uploadDate.toISOString() : null,
-        })),
+        }))
       }));
 
       res.json(formattedMembers);
@@ -81,52 +100,45 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/family-members", async (req, res) => {
     try {
-      const { relationships: relationshipData, ...memberData } = req.body;
+      const { relationships: relationshipData, ...memberData } = req.body as {
+        relationships: RelationshipInput[];
+        [key: string]: any;
+      };
 
       // Insert the member first
       const [member] = await db.insert(familyMembers).values(memberData).returning();
 
       // Add relationships if any
       if (relationshipData && relationshipData.length > 0) {
-        // Check for existing relationships
-        const existingRelationships = await db.query.relationships.findMany({
-          where: or(
-            and(
-              eq(relationships.personId, member.id),
-              eq(relationships.relationType, relationshipData[0].relationType)
-            ),
-            and(
-              eq(relationships.relatedPersonId, member.id),
-              eq(relationships.relationType, relationshipData[0].relationType === 'parent' ? 'child' :
-                                        relationshipData[0].relationType === 'child' ? 'parent' :
-                                        'spouse')
-            )
-          ),
-        });
+        try {
+          const relationshipsToInsert = relationshipData.flatMap((rel: RelationshipInput) => {
+            const relatedPersonId = parseInt(rel.relatedPersonId);
+            return [
+              {
+                personId: member.id,
+                relatedPersonId,
+                relationType: rel.relationType,
+              },
+              {
+                personId: relatedPersonId,
+                relatedPersonId: member.id,
+                relationType: rel.relationType === 'parent' ? 'child' :
+                  rel.relationType === 'child' ? 'parent' :
+                    'spouse',
+              }
+            ];
+          });
 
-        if (existingRelationships.length > 0) {
-          return res.status(400).json({ message: "Duplicate relationships detected" });
+          await db.insert(relationships).values(relationshipsToInsert);
+        } catch (error: any) {
+          if (error.message?.includes('Self-relationships are not allowed')) {
+            return res.status(400).json({ message: "Self-relationships are not allowed" });
+          }
+          if (error.message?.includes('unique_relationship_idx')) {
+            return res.status(400).json({ message: "Duplicate relationships are not allowed" });
+          }
+          throw error;
         }
-
-        const relationshipsToInsert = relationshipData.flatMap(rel => {
-          const relatedPersonId = parseInt(rel.relatedPersonId);
-          return [
-            {
-              personId: member.id,
-              relatedPersonId,
-              relationType: rel.relationType,
-            },
-            {
-              personId: relatedPersonId,
-              relatedPersonId: member.id,
-              relationType: rel.relationType === 'parent' ? 'child' :
-                         rel.relationType === 'child' ? 'parent' :
-                         'spouse',
-            }
-          ];
-        });
-
-        await db.insert(relationships).values(relationshipsToInsert);
       }
 
       // Fetch the complete member data with relationships
@@ -135,10 +147,10 @@ export function registerRoutes(app: Express): Server {
         with: {
           relationships: {
             with: {
-              relatedPerson: true,
-            },
-          },
-        },
+              relatedPerson: true
+            }
+          }
+        }
       });
 
       res.json(newMember);
@@ -151,7 +163,10 @@ export function registerRoutes(app: Express): Server {
   app.put("/api/family-members/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { relationships: newRelationships, ...memberData } = req.body;
+      const { relationships: newRelationships, ...memberData } = req.body as {
+        relationships: RelationshipInput[];
+        [key: string]: any;
+      };
 
       // Format dates properly for database
       const formattedMemberData = {
@@ -175,7 +190,7 @@ export function registerRoutes(app: Express): Server {
 
         // Check for duplicates in new relationships
         const seen = new Set();
-        const hasDuplicates = newRelationships.some(rel => {
+        const hasDuplicates = newRelationships.some((rel: RelationshipInput) => {
           const key = `${rel.relatedPersonId}-${rel.relationType}`;
           if (seen.has(key)) return true;
           seen.add(key);
@@ -188,7 +203,7 @@ export function registerRoutes(app: Express): Server {
 
         // Add new relationships if any
         if (newRelationships.length > 0) {
-          const relationshipsToInsert = newRelationships.flatMap(rel => {
+          const relationshipsToInsert = newRelationships.flatMap((rel: RelationshipInput) => {
             const relatedPersonId = parseInt(rel.relatedPersonId);
             return [
               {
@@ -200,8 +215,8 @@ export function registerRoutes(app: Express): Server {
                 personId: relatedPersonId,
                 relatedPersonId: member.id,
                 relationType: rel.relationType === 'parent' ? 'child' :
-                           rel.relationType === 'child' ? 'parent' :
-                           'spouse',
+                  rel.relationType === 'child' ? 'parent' :
+                    'spouse',
               }
             ];
           });
@@ -216,11 +231,11 @@ export function registerRoutes(app: Express): Server {
         with: {
           relationships: {
             with: {
-              relatedPerson: true,
-            },
+              relatedPerson: true
+            }
           },
-          documents: true,
-        },
+          documents: true
+        }
       });
 
       res.json(updatedMember);
@@ -411,7 +426,7 @@ export function registerRoutes(app: Express): Server {
         - Currently lives in ${member.currentLocation || "an unspecified location"}
         - Family connections: ${familyContext || "No known family connections"}
         - Additional information: ${member.bio || ""}
-
+        
         Please write a warm, personal narrative that weaves together these facts into a cohesive story 
         about their life and family connections. Focus on significant life moments, family relationships, 
         and the bonds that connect them to their relatives. Keep the tone respectful and focus on 
