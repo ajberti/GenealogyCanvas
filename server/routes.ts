@@ -2,10 +2,47 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { familyMembers, relationships, documents } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from 'express';
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = "uploads";
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir);
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and PDF files are allowed.'));
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
+
+  // Add static file serving for uploads
+  app.use('/uploads', express.static('uploads'));
 
   // Family Members
   app.get("/api/family-members", async (req, res) => {
@@ -56,9 +93,28 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Documents
-  app.post("/api/documents", async (req, res) => {
-    const document = await db.insert(documents).values(req.body).returning();
-    res.json(document[0]);
+  app.post("/api/documents", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { familyMemberId, title, documentType, description } = req.body;
+      const fileUrl = `/uploads/${req.file.filename}`;
+
+      const document = await db.insert(documents).values({
+        familyMemberId: parseInt(familyMemberId),
+        title,
+        documentType,
+        fileUrl,
+        description
+      }).returning();
+
+      res.json(document[0]);
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
   });
 
   app.delete("/api/documents/:id", async (req, res) => {

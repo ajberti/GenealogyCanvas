@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,11 +20,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { FamilyMember, Document } from "@/lib/types";
+import type { FamilyMember } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import DocumentViewer from "./DocumentViewer";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/png", "image/gif", "application/pdf"];
 
 const documentSchema = z.object({
   memberId: z.string().min(1, "Please select a family member"),
@@ -33,7 +35,14 @@ const documentSchema = z.object({
   documentType: z.enum(["photo", "certificate", "record"], {
     required_error: "Please select a document type",
   }),
-  fileUrl: z.string().url("Please enter a valid URL"),
+  file: z
+    .instanceof(FileList)
+    .refine((files) => files.length > 0, "File is required")
+    .refine((files) => files[0]?.size <= MAX_FILE_SIZE, "Max file size is 5MB")
+    .refine(
+      (files) => ACCEPTED_FILE_TYPES.includes(files[0]?.type),
+      "Only .jpg, .jpeg, .png, .gif and .pdf files are accepted"
+    ),
   description: z.string().optional(),
 });
 
@@ -49,7 +58,7 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
   const [selectedMember, setSelectedMember] = useState<number | null>(null);
 
   const selectedMemberDocs = selectedMember
-    ? members.find(m => m.id === selectedMember)?.documents || []
+    ? members.find((m) => m.id === selectedMember)?.documents || []
     : [];
 
   const form = useForm<FormValues>({
@@ -57,20 +66,22 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
     defaultValues: {
       title: "",
       documentType: undefined,
-      fileUrl: "",
       description: "",
     },
   });
 
   const mutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      const formData = new FormData();
+      formData.append("familyMemberId", data.memberId);
+      formData.append("title", data.title);
+      formData.append("documentType", data.documentType);
+      if (data.description) formData.append("description", data.description);
+      if (data.file[0]) formData.append("file", data.file[0]);
+
       const res = await fetch("/api/documents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          familyMemberId: Number(data.memberId),
-        }),
+        body: formData,
       });
 
       if (!res.ok) throw new Error("Failed to upload document");
@@ -168,12 +179,17 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
 
               <FormField
                 control={form.control}
-                name="fileUrl"
-                render={({ field }) => (
+                name="file"
+                render={({ field: { onChange, ...field } }) => (
                   <FormItem>
-                    <FormLabel>File URL</FormLabel>
+                    <FormLabel>Upload File</FormLabel>
                     <FormControl>
-                      <Input type="url" {...field} />
+                      <Input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.gif,.pdf"
+                        onChange={(e) => onChange(e.target.files)}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
