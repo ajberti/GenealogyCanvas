@@ -2,14 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
 import { familyMembers, relationships } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import express from 'express';
 import OpenAI from "openai";
 
 const openai = new OpenAI();
 
 interface RelationshipInput {
-  relatedPersonId: string;
+  toMemberId: string;
   relationType: 'parent' | 'child' | 'spouse';
 }
 
@@ -21,20 +21,24 @@ export function registerRoutes(app: Express): Server {
     try {
       const members = await db.query.familyMembers.findMany({
         with: {
-          outgoingRelations: {
+          fromRelationships: {
             with: {
-              relatedPerson: true
+              toMember: true
             }
           }
         }
       });
 
-      // Format dates safely
       const formattedMembers = members.map(member => ({
         ...member,
-        birthDate: member.birthDate ? member.birthDate.toISOString() : null,
-        deathDate: member.deathDate ? member.deathDate.toISOString() : null,
-        relationships: member.outgoingRelations
+        birthDate: member.birthDate?.toISOString() || null,
+        deathDate: member.deathDate?.toISOString() || null,
+        relationships: member.fromRelationships?.map(rel => ({
+          id: rel.id,
+          relatedPersonId: rel.toMemberId,
+          relationType: rel.relationType,
+          relatedPerson: rel.toMember
+        }))
       }));
 
       res.json(formattedMembers);
@@ -58,25 +62,12 @@ export function registerRoutes(app: Express): Server {
         bio: memberData.bio,
       }).returning();
 
-      // Add relationships if any
       if (relationshipData && relationshipData.length > 0) {
-        const relationshipsToInsert = relationshipData.flatMap((rel: RelationshipInput) => {
-          const relatedPersonId = parseInt(rel.relatedPersonId);
-          return [
-            {
-              personId: member.id,
-              relatedPersonId,
-              relationType: rel.relationType,
-            },
-            {
-              personId: relatedPersonId,
-              relatedPersonId: member.id,
-              relationType: rel.relationType === 'parent' ? 'child' :
-                rel.relationType === 'child' ? 'parent' :
-                  'spouse',
-            }
-          ];
-        });
+        const relationshipsToInsert = relationshipData.map((rel: RelationshipInput) => ({
+          fromMemberId: member.id,
+          toMemberId: parseInt(rel.toMemberId),
+          relationType: rel.relationType,
+        }));
 
         await db.insert(relationships).values(relationshipsToInsert);
       }
@@ -84,15 +75,23 @@ export function registerRoutes(app: Express): Server {
       const newMember = await db.query.familyMembers.findFirst({
         where: eq(familyMembers.id, member.id),
         with: {
-          outgoingRelations: {
+          fromRelationships: {
             with: {
-              relatedPerson: true
+              toMember: true
             }
           }
         }
       });
 
-      res.json({ ...newMember, relationships: newMember?.outgoingRelations });
+      res.json({
+        ...newMember,
+        relationships: newMember?.fromRelationships?.map(rel => ({
+          id: rel.id,
+          relatedPersonId: rel.toMemberId,
+          relationType: rel.relationType,
+          relatedPerson: rel.toMember
+        }))
+      });
     } catch (error) {
       console.error('Error creating family member:', error);
       res.status(500).json({ message: "Failed to create family member" });
@@ -102,10 +101,7 @@ export function registerRoutes(app: Express): Server {
   app.put("/api/family-members/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { relationships: newRelationships, ...memberData } = req.body as {
-        relationships: RelationshipInput[];
-        [key: string]: any;
-      };
+      const { relationships: newRelationships, ...memberData } = req.body;
 
       // Format dates properly for database
       const formattedMemberData = {
@@ -125,40 +121,15 @@ export function registerRoutes(app: Express): Server {
       if (newRelationships) {
         // Delete existing relationships
         await db.delete(relationships)
-          .where(eq(relationships.personId, parseInt(id)));
-
-        // Check for duplicates in new relationships
-        const seen = new Set();
-        const hasDuplicates = newRelationships.some((rel: RelationshipInput) => {
-          const key = `${rel.relatedPersonId}-${rel.relationType}`;
-          if (seen.has(key)) return true;
-          seen.add(key);
-          return false;
-        });
-
-        if (hasDuplicates) {
-          return res.status(400).json({ message: "Duplicate relationships detected" });
-        }
+          .where(eq(relationships.fromMemberId, parseInt(id)));
 
         // Add new relationships if any
         if (newRelationships.length > 0) {
-          const relationshipsToInsert = newRelationships.flatMap((rel: RelationshipInput) => {
-            const relatedPersonId = parseInt(rel.relatedPersonId);
-            return [
-              {
-                personId: member.id,
-                relatedPersonId,
-                relationType: rel.relationType,
-              },
-              {
-                personId: relatedPersonId,
-                relatedPersonId: member.id,
-                relationType: rel.relationType === 'parent' ? 'child' :
-                  rel.relationType === 'child' ? 'parent' :
-                    'spouse',
-              }
-            ];
-          });
+          const relationshipsToInsert = newRelationships.map((rel: RelationshipInput) => ({
+            fromMemberId: member.id,
+            toMemberId: parseInt(rel.toMemberId),
+            relationType: rel.relationType,
+          }));
 
           await db.insert(relationships).values(relationshipsToInsert);
         }
@@ -168,15 +139,23 @@ export function registerRoutes(app: Express): Server {
       const updatedMember = await db.query.familyMembers.findFirst({
         where: eq(familyMembers.id, parseInt(id)),
         with: {
-          outgoingRelations: {
+          fromRelationships: {
             with: {
-              relatedPerson: true
+              toMember: true
             }
           }
         }
       });
 
-      res.json(updatedMember);
+      res.json({
+        ...updatedMember,
+        relationships: updatedMember?.fromRelationships?.map(rel => ({
+          id: rel.id,
+          relatedPersonId: rel.toMemberId,
+          relationType: rel.relationType,
+          relatedPerson: rel.toMember
+        }))
+      });
     } catch (error) {
       console.error('Error updating family member:', error);
       res.status(500).json({ message: "Failed to update family member" });
@@ -238,30 +217,41 @@ export function registerRoutes(app: Express): Server {
         bio: "Middle generation",
       }).returning();
 
-      const [mother] = await db.insert(familyMembers).values({
-        firstName: "Sarah",
-        lastName: "Smith",
-        gender: "female",
-        birthDate: new Date("1968-12-25"),
-        birthPlace: "Leeds",
-        bio: "Joined the family through marriage",
-      }).returning();
-
       // Add relationships
       await db.insert(relationships).values([
-        // Grandparents relationship
-        { personId: grandfather.id, relatedPersonId: grandmother.id, relationType: "spouse" },
-        { personId: grandmother.id, relatedPersonId: grandfather.id, relationType: "spouse" },
-
+        // Grandfather's relationships
+        {
+          fromMemberId: grandfather.id,
+          toMemberId: grandmother.id,
+          relationType: "spouse",
+        },
+        {
+          fromMemberId: grandfather.id,
+          toMemberId: father.id,
+          relationType: "child",
+        },
+        // Grandmother's relationships
+        {
+          fromMemberId: grandmother.id,
+          toMemberId: grandfather.id,
+          relationType: "spouse",
+        },
+        {
+          fromMemberId: grandmother.id,
+          toMemberId: father.id,
+          relationType: "child",
+        },
         // Father's relationships
-        { personId: father.id, relatedPersonId: grandfather.id, relationType: "parent" },
-        { personId: father.id, relatedPersonId: grandmother.id, relationType: "parent" },
-        { personId: father.id, relatedPersonId: mother.id, relationType: "spouse" },
-
-        // Reciprocal relationships
-        { personId: grandfather.id, relatedPersonId: father.id, relationType: "child" },
-        { personId: grandmother.id, relatedPersonId: father.id, relationType: "child" },
-        { personId: mother.id, relatedPersonId: father.id, relationType: "spouse" },
+        {
+          fromMemberId: father.id,
+          toMemberId: grandfather.id,
+          relationType: "parent",
+        },
+        {
+          fromMemberId: father.id,
+          toMemberId: grandmother.id,
+          relationType: "parent",
+        },
       ]);
 
       res.json({ success: true, message: "Sample data seeded successfully" });
@@ -276,13 +266,12 @@ export function registerRoutes(app: Express): Server {
     try {
       const { id } = req.params;
 
-      // Fetch member with relationships
       const member = await db.query.familyMembers.findFirst({
         where: eq(familyMembers.id, parseInt(id)),
         with: {
-          outgoingRelations: {
+          fromRelationships: {
             with: {
-              relatedPerson: true,
+              toMember: true,
             },
           },
         },
@@ -292,27 +281,23 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Member not found" });
       }
 
-      // Prepare family context
-      const familyContext = member.outgoingRelations?.map(rel => {
-        const relation = rel.relationType;
-        const related = rel.relatedPerson;
-        return `${related?.firstName} ${related?.lastName} is their ${relation}`;
+      const familyContext = member.fromRelationships?.map(rel => {
+        const related = rel.toMember;
+        return `${related?.firstName} ${related?.lastName} is their ${rel.relationType}`;
       }).join(". ");
 
-      // Generate story prompt
       const prompt = `Create a heartwarming and engaging family story about ${member.firstName} ${member.lastName}. 
         Here are the key details about them:
         - Born in ${member.birthPlace || "an unknown location"}
         - Currently lives in ${member.currentLocation || "an unspecified location"}
         - Family connections: ${familyContext || "No known family connections"}
         - Additional information: ${member.bio || ""}
-        
+
         Please write a warm, personal narrative that weaves together these facts into a cohesive story 
         about their life and family connections. Focus on significant life moments, family relationships, 
         and the bonds that connect them to their relatives. Keep the tone respectful and focus on 
         positive aspects of family relationships and life events.`;
 
-      // Generate story using OpenAI
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [

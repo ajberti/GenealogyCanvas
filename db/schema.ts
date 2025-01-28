@@ -18,30 +18,40 @@ export const familyMembers = pgTable("family_members", {
 
 export const relationships = pgTable("relationships", {
   id: serial("id").primaryKey(),
-  personId: integer("person_id").notNull().references(() => familyMembers.id, { onDelete: 'cascade' }),
-  relatedPersonId: integer("related_person_id").notNull().references(() => familyMembers.id, { onDelete: 'cascade' }),
+  fromMemberId: integer("from_member_id")
+    .notNull()
+    .references(() => familyMembers.id, { onDelete: 'cascade' }),
+  toMemberId: integer("to_member_id")
+    .notNull()
+    .references(() => familyMembers.id, { onDelete: 'cascade' }),
   relationType: text("relation_type").notNull(),
   createdAt: timestamp("created_at").default(sql`NOW()`),
 }, (table) => ({
-  uniqueIdx: uniqueIndex("unique_relationship_idx").on(table.personId, table.relatedPersonId, table.relationType),
-  selfRelationCheck: sql`CONSTRAINT prevent_self_relation CHECK ((person_id <> related_person_id) IS TRUE)`,
+  uniqueRelation: uniqueIndex("unique_relation_idx").on(
+    table.fromMemberId, 
+    table.toMemberId,
+    table.relationType
+  ),
 }));
 
 // Define relations
-export const familyMembersRelations = relations(familyMembers, ({ many }) => ({
-  outgoingRelations: many(relationships, {
+export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
+  fromRelationships: many(relationships, {
+    relationName: "fromMemberRelations",
     fields: [familyMembers.id],
-    references: [relationships.personId],
+    references: [relationships.fromMemberId],
   }),
 }));
 
-export const relationshipsRelations = relations(relationships, ({ one }) => ({
-  person: one(familyMembers, {
-    fields: [relationships.personId],
+export const relationshipRelations = relations(relationships, ({ one }) => ({
+  fromMember: one(familyMembers, {
+    relationName: "fromMemberRelations",
+    fields: [relationships.fromMemberId],
     references: [familyMembers.id],
   }),
-  relatedPerson: one(familyMembers, {
-    fields: [relationships.relatedPersonId],
+  toMember: one(familyMembers, {
+    relationName: "toMemberRelations",
+    fields: [relationships.toMemberId],
     references: [familyMembers.id],
   }),
 }));
