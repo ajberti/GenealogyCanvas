@@ -33,23 +33,28 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
         parents: [] as TreeNode[]
       }]));
 
+      // First pass: establish all relationships
       members.forEach(member => {
         member.relationships?.forEach(rel => {
           const node = memberMap.get(member.id)!;
           const related = memberMap.get(rel.relatedPersonId);
 
-          if (related && rel.relationType === 'child') {
-            node.children?.push(related);
-          } else if (related && rel.relationType === 'spouse') {
-            node.spouse = related;
-          } else if (related && rel.relationType === 'parent') {
-            node.parents?.push(related);
+          if (related) {
+            if (rel.relationType === 'child') {
+              node.children?.push(related);
+            } else if (rel.relationType === 'spouse') {
+              node.spouse = related;
+            } else if (rel.relationType === 'parent') {
+              node.parents?.push(related);
+            }
           }
         });
       });
 
-      // Find root node (member without parents)
-      const roots = Array.from(memberMap.values()).filter(node => !node.parents?.length);
+      // Find root node (member without parents or with only spouse relationship)
+      const roots = Array.from(memberMap.values()).filter(node => 
+        !node.parents?.length && (!node.spouse || node.id < node.spouse.id)
+      );
       return roots[0] || memberMap.values().next().value;
     };
 
@@ -62,11 +67,11 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .append("g")
       .attr("transform", `translate(${width/2},50)`);
 
-    // Increased node sizing and adjusted separation
+    // Increased node sizing for spouse pairs
     const tree = d3.tree<TreeNode>()
-      .nodeSize([120, 200]) // Increased from [80, 160]
+      .nodeSize([160, 200])
       .separation((a: d3.HierarchyNode<TreeNode>, b: d3.HierarchyNode<TreeNode>) => {
-        return a.parent === b.parent ? 1.5 : 2; // Increased separation values
+        return a.parent === b.parent ? 1.5 : 2;
       });
 
     const hierarchy = d3.hierarchy(root);
@@ -84,6 +89,22 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .attr("stroke", "hsl(25, 40%, 35%)")
       .attr("stroke-width", 1);
 
+    // Add spouse links
+    const spouseLinks = svg.selectAll("path.spouse-link")
+      .data(treeData.descendants().filter((d: D3TreeNode) => d.data.spouse))
+      .join("path")
+      .attr("class", "spouse-link")
+      .attr("d", (d: D3TreeNode) => {
+        // Create a horizontal line between spouses
+        const startX = d.x;
+        const endX = d.x + 80; // Spouse offset
+        const y = d.y;
+        return `M${startX},${y} L${endX},${y}`;
+      })
+      .attr("stroke", "hsl(25, 40%, 35%)")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "4,4");
+
     // Add nodes
     const nodes = svg.selectAll("g.node")
       .data(treeData.descendants())
@@ -91,21 +112,46 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .attr("class", "node")
       .attr("transform", (d: D3TreeNode) => `translate(${d.x},${d.y})`);
 
+    // Add spouse nodes
+    const spouseNodes = svg.selectAll("g.spouse-node")
+      .data(treeData.descendants().filter((d: D3TreeNode) => d.data.spouse))
+      .join("g")
+      .attr("class", "spouse-node")
+      .attr("transform", (d: D3TreeNode) => `translate(${d.x + 80},${d.y})`);
+
+    // Style nodes
     nodes.append("circle")
       .attr("r", 5)
       .attr("fill", "hsl(25, 40%, 35%)");
 
-    // Adjusted text positioning and styling
     nodes.append("text")
       .attr("dy", "1.5em")
-      .attr("x", -40) // Increased from -30
+      .attr("x", -40)
       .attr("text-anchor", "middle")
       .text((d: D3TreeNode) => `${d.data.firstName} ${d.data.lastName}`)
+      .attr("class", "text-sm font-serif");
+
+    // Style spouse nodes
+    spouseNodes.append("circle")
+      .attr("r", 5)
+      .attr("fill", "hsl(25, 40%, 35%)");
+
+    spouseNodes.append("text")
+      .attr("dy", "1.5em")
+      .attr("x", 40)
+      .attr("text-anchor", "middle")
+      .text((d: D3TreeNode) => `${d.data.spouse?.firstName} ${d.data.spouse?.lastName}`)
       .attr("class", "text-sm font-serif");
 
     // Add click handlers
     nodes.on("click", (_: PointerEvent, d: D3TreeNode) => {
       onSelectMember(d.data);
+    });
+
+    spouseNodes.on("click", (_: PointerEvent, d: D3TreeNode) => {
+      if (d.data.spouse) {
+        onSelectMember(d.data.spouse);
+      }
     });
 
   }, [members, isLoading, onSelectMember]);
