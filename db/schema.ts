@@ -54,20 +54,38 @@ export const documents = pgTable("documents", {
   uploadDate: timestamp("upload_date").notNull().defaultNow(),
 });
 
+// Define relations
 export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
-  fromRelationships: many(relationships),
-  timelineEvents: many(timelineEvents),
-  documents: many(documents),
+  fromRelationships: many(relationships, { relationName: "fromMemberRelations" }),
+  timelineEvents: many(timelineEvents, { relationName: "memberTimelineEvents" }),
+  documents: many(documents, { relationName: "memberDocuments" }),
 }));
 
 export const relationshipRelations = relations(relationships, ({ one }) => ({
   fromMember: one(familyMembers, {
     fields: [relationships.fromMemberId],
     references: [familyMembers.id],
+    relationName: "fromMemberRelations"
   }),
   toMember: one(familyMembers, {
     fields: [relationships.toMemberId],
     references: [familyMembers.id],
+  }),
+}));
+
+export const timelineEventRelations = relations(timelineEvents, ({ one }) => ({
+  familyMember: one(familyMembers, {
+    fields: [timelineEvents.familyMemberId],
+    references: [familyMembers.id],
+    relationName: "memberTimelineEvents"
+  }),
+}));
+
+export const documentRelations = relations(documents, ({ one }) => ({
+  familyMember: one(familyMembers, {
+    fields: [documents.familyMemberId],
+    references: [familyMembers.id],
+    relationName: "memberDocuments"
   }),
 }));
 
