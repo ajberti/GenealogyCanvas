@@ -166,5 +166,215 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add seed data endpoint
+  app.post("/api/seed", async (req, res) => {
+    try {
+      // Add sample family members
+      const [grandfather] = await db.insert(familyMembers).values({
+        firstName: "John",
+        lastName: "Smith",
+        gender: "male",
+        birthDate: new Date("1940-03-15"),
+        birthPlace: "London",
+        bio: "Family patriarch, retired engineer and devoted grandfather",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+
+      const [grandmother] = await db.insert(familyMembers).values({
+        firstName: "Mary",
+        lastName: "Smith",
+        gender: "female",
+        birthDate: new Date("1942-06-20"),
+        birthPlace: "Manchester",
+        bio: "Family matriarch, former teacher and passionate gardener",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+
+      const [father] = await db.insert(familyMembers).values({
+        firstName: "James",
+        lastName: "Smith",
+        gender: "male",
+        birthDate: new Date("1965-09-10"),
+        birthPlace: "Birmingham",
+        bio: "Software engineer and amateur photographer",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+
+      const [mother] = await db.insert(familyMembers).values({
+        firstName: "Sarah",
+        lastName: "Smith",
+        gender: "female",
+        birthDate: new Date("1968-04-25"),
+        birthPlace: "Bristol",
+        bio: "Pediatrician and avid reader",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+
+      const [son] = await db.insert(familyMembers).values({
+        firstName: "Michael",
+        lastName: "Smith",
+        gender: "male",
+        birthDate: new Date("1995-12-03"),
+        birthPlace: "London",
+        bio: "University student studying Computer Science",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }).returning();
+
+      // Add relationships
+      await db.insert(relationships).values([
+        // Grandparents' marriage
+        {
+          fromMemberId: grandfather.id,
+          toMemberId: grandmother.id,
+          relationType: "spouse",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: grandmother.id,
+          toMemberId: grandfather.id,
+          relationType: "spouse",
+          createdAt: new Date()
+        },
+        // Parents' marriage
+        {
+          fromMemberId: father.id,
+          toMemberId: mother.id,
+          relationType: "spouse",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: mother.id,
+          toMemberId: father.id,
+          relationType: "spouse",
+          createdAt: new Date()
+        },
+        // Parent-child relationships
+        {
+          fromMemberId: grandfather.id,
+          toMemberId: father.id,
+          relationType: "child",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: grandmother.id,
+          toMemberId: father.id,
+          relationType: "child",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: father.id,
+          toMemberId: son.id,
+          relationType: "child",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: mother.id,
+          toMemberId: son.id,
+          relationType: "child",
+          createdAt: new Date()
+        },
+        // Child-parent relationships
+        {
+          fromMemberId: father.id,
+          toMemberId: grandfather.id,
+          relationType: "parent",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: father.id,
+          toMemberId: grandmother.id,
+          relationType: "parent",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: son.id,
+          toMemberId: father.id,
+          relationType: "parent",
+          createdAt: new Date()
+        },
+        {
+          fromMemberId: son.id,
+          toMemberId: mother.id,
+          relationType: "parent",
+          createdAt: new Date()
+        }
+      ]);
+
+      // Add timeline events
+      await db.insert(timelineEvents).values([
+        {
+          familyMemberId: grandfather.id,
+          title: "Graduated University",
+          description: "Graduated from Imperial College with a degree in Engineering",
+          eventDate: new Date("1962-06-15"),
+          location: "London",
+          eventType: "education",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          familyMemberId: grandfather.id,
+          title: "Marriage",
+          description: "Married Mary in a traditional ceremony",
+          eventDate: new Date("1964-08-20"),
+          location: "Manchester Cathedral",
+          eventType: "marriage",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          familyMemberId: grandmother.id,
+          title: "Started Teaching Career",
+          description: "Began teaching at Manchester Grammar School",
+          eventDate: new Date("1963-09-01"),
+          location: "Manchester",
+          eventType: "career",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          familyMemberId: father.id,
+          title: "University Graduation",
+          description: "Graduated with First Class Honours in Computer Science",
+          eventDate: new Date("1987-07-01"),
+          location: "Cambridge",
+          eventType: "education",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          familyMemberId: mother.id,
+          title: "Medical School Graduation",
+          description: "Completed medical school with specialization in pediatrics",
+          eventDate: new Date("1992-05-15"),
+          location: "London",
+          eventType: "education",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          familyMemberId: son.id,
+          title: "Started University",
+          description: "Began studying Computer Science at University College London",
+          eventDate: new Date("2014-09-20"),
+          location: "London",
+          eventType: "education",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ]);
+
+      res.json({ success: true, message: "Sample data seeded successfully" });
+    } catch (error) {
+      console.error("Error seeding data:", error);
+      res.status(500).json({ success: false, message: "Error seeding data" });
+    }
+  });
+
   return httpServer;
 }
