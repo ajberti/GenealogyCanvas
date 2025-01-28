@@ -105,7 +105,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add update endpoint right after the create endpoint
+  // Update endpoint handling - replace the existing update endpoint code
   app.put("/api/family-members/:id", async (req, res) => {
     try {
       const memberId = parseInt(req.params.id);
@@ -130,9 +130,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Family member not found" });
       }
 
-      // Delete existing relationships
+      // Delete all existing relationships for this member
       await db.delete(relationships)
         .where(eq(relationships.fromMemberId, memberId));
+
+      // Also delete any reciprocal relationships where this member is the target
+      await db.delete(relationships)
+        .where(eq(relationships.toMemberId, memberId));
 
       // If there are new relationships, add them
       if (relationshipData && Array.isArray(relationshipData) && relationshipData.length > 0) {
@@ -140,24 +144,50 @@ export function registerRoutes(app: Express): Server {
           rel => rel && rel.relatedPersonId && rel.relationType
         );
 
+        // Create a Set to track processed relationships and avoid duplicates
+        const processedRelationships = new Set();
+
         for (const rel of validRelationships) {
-          // Insert the primary relationship
+          const relatedPersonId = parseInt(rel.relatedPersonId);
+          const relationshipKey = `${memberId}-${relatedPersonId}-${rel.relationType}`;
+
+          // Skip if we've already processed this relationship
+          if (processedRelationships.has(relationshipKey)) continue;
+
+          // Add the primary relationship
           await db.insert(relationships).values({
             fromMemberId: memberId,
-            toMemberId: parseInt(rel.relatedPersonId),
+            toMemberId: relatedPersonId,
             relationType: rel.relationType,
             createdAt: new Date()
           });
 
-          // For spouse relationships, create the reciprocal relationship
-          if (rel.relationType === 'spouse') {
+          // Add reciprocal relationship based on type
+          let reciprocalType;
+          switch (rel.relationType) {
+            case 'parent':
+              reciprocalType = 'child';
+              break;
+            case 'child':
+              reciprocalType = 'parent';
+              break;
+            case 'spouse':
+              reciprocalType = 'spouse';
+              break;
+          }
+
+          if (reciprocalType) {
             await db.insert(relationships).values({
-              fromMemberId: parseInt(rel.relatedPersonId),
+              fromMemberId: relatedPersonId,
               toMemberId: memberId,
-              relationType: 'spouse',
+              relationType: reciprocalType,
               createdAt: new Date()
             });
           }
+
+          // Mark this relationship as processed
+          processedRelationships.add(relationshipKey);
+          processedRelationships.add(`${relatedPersonId}-${memberId}-${reciprocalType}`);
         }
       }
 
