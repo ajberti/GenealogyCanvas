@@ -3,7 +3,7 @@ import * as d3 from "d3";
 import type { TreeNode, FamilyMember } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface FamilyTreeProps {
   members: FamilyMember[];
@@ -25,6 +25,15 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
     // Set fixed dimensions for the tree
     const width = 1200; // Fixed width for the SVG
     const height = 800; // Fixed height for the SVG
+
+    // Clear previous svg
+    d3.select(svgRef.current).selectAll("*").remove();
+
+    const svg = d3.select(svgRef.current)
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(${width/2},50)`);
 
     // Transform data into hierarchical structure
     const buildTree = (members: FamilyMember[]): TreeNode => {
@@ -61,15 +70,6 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
     };
 
     const root = buildTree(members);
-
-    // Clear previous svg
-    d3.select(svgRef.current).selectAll("*").remove();
-
-    const svg = d3.select(svgRef.current)
-      .attr("width", width)
-      .attr("height", height)
-      .append("g")
-      .attr("transform", `translate(${width/2},50)`);
 
     // Increased node sizing for spouse pairs
     const tree = d3.tree<TreeNode>()
@@ -165,13 +165,15 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
 
   return (
     <Card className="w-full h-[600px]">
-      <ScrollArea className="h-full w-full rounded-md">
+      <ScrollArea className="h-full w-full" orientation="both">
         <div className="relative w-full h-full min-w-[1200px] min-h-[800px]">
           <svg
             ref={svgRef}
             className="absolute inset-0"
           />
         </div>
+        <ScrollBar orientation="horizontal" />
+        <ScrollBar orientation="vertical" />
       </ScrollArea>
     </Card>
   );
