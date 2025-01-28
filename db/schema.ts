@@ -42,19 +42,39 @@ export const timelineEvents = pgTable("timeline_events", {
   updatedAt: timestamp("updated_at").default(sql`NOW()`).notNull(),
 });
 
-// Define relations with explicit fields
+// Define relations with explicit names
 export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
-  relationships: many(relationships, { fields: [familyMembers.id], references: [relationships.fromMemberId] }),
-  timelineEvents: many(timelineEvents, { fields: [familyMembers.id], references: [timelineEvents.familyMemberId] }),
+  fromRelationships: many(relationships, {
+    relationName: "memberFromRelations",
+    fields: [familyMembers.id],
+    references: [relationships.fromMemberId]
+  }),
+  timelineEvents: many(timelineEvents, {
+    relationName: "memberTimelineEvents",
+    fields: [familyMembers.id],
+    references: [timelineEvents.familyMemberId]
+  }),
 }));
 
 export const relationshipRelations = relations(relationships, ({ one }) => ({
-  fromMember: one(familyMembers, { fields: [relationships.fromMemberId], references: [familyMembers.id] }),
-  toMember: one(familyMembers, { fields: [relationships.toMemberId], references: [familyMembers.id] }),
+  fromMember: one(familyMembers, {
+    relationName: "memberFromRelations",
+    fields: [relationships.fromMemberId],
+    references: [familyMembers.id]
+  }),
+  toMember: one(familyMembers, {
+    relationName: "memberToRelations",
+    fields: [relationships.toMemberId],
+    references: [familyMembers.id]
+  }),
 }));
 
 export const timelineEventRelations = relations(timelineEvents, ({ one }) => ({
-  familyMember: one(familyMembers, { fields: [timelineEvents.familyMemberId], references: [familyMembers.id] }),
+  familyMember: one(familyMembers, {
+    relationName: "memberTimelineEvents",
+    fields: [timelineEvents.familyMemberId],
+    references: [familyMembers.id]
+  }),
 }));
 
 // Export types and schemas
