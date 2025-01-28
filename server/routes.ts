@@ -53,6 +53,37 @@ export function registerRoutes(app: Express): Server {
     next();
   });
 
+  // Add family member
+  app.post("/api/family-members", async (req, res) => {
+    try {
+      const { relationships, ...memberData } = req.body;
+
+      // Insert the new family member
+      const [member] = await db.insert(familyMembers).values({
+        ...memberData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+
+      // If there are relationships, add them
+      if (relationships && relationships.length > 0) {
+        const relationshipValues = relationships.map(rel => ({
+          fromMemberId: member.id,
+          toMemberId: parseInt(rel.relatedPersonId),
+          relationType: rel.relationType,
+          createdAt: new Date()
+        }));
+
+        await db.insert(relationships).values(relationshipValues);
+      }
+
+      res.json(member);
+    } catch (error) {
+      console.error('Error creating family member:', error);
+      res.status(500).json({ message: "Failed to create family member" });
+    }
+  });
+
   // Get all family members with relationships and timeline events
   app.get("/api/family-members", async (req, res) => {
     try {

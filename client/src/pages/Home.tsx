@@ -5,7 +5,8 @@ import FamilyTree from "@/components/FamilyTree";
 import MemberForm from "@/components/MemberForm";
 import DocumentUpload from "@/components/DocumentUpload";
 import type { FamilyMember } from "@/lib/types";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -88,12 +89,17 @@ export default function Home() {
       </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <MemberForm
-            member={selectedMember}
-            onClose={() => setIsEditDialogOpen(false)}
-            existingMembers={members}
-          />
+        <DialogContent className="max-w-3xl max-h-[90vh]">
+          <DialogTitle>
+            {selectedMember ? "Edit Family Member" : "Add New Member"}
+          </DialogTitle>
+          <ScrollArea className="h-full max-h-[calc(90vh-120px)] pr-4">
+            <MemberForm
+              member={selectedMember}
+              onClose={() => setIsEditDialogOpen(false)}
+              existingMembers={members}
+            />
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
