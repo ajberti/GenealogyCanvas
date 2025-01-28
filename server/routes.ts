@@ -56,7 +56,7 @@ export function registerRoutes(app: Express): Server {
   // Add family member
   app.post("/api/family-members", async (req, res) => {
     try {
-      const { relationships, birthDate, deathDate, ...memberData } = req.body;
+      const { relationships: relationshipData, birthDate, deathDate, ...memberData } = req.body;
 
       // Convert string dates to Date objects for database insertion
       const formattedData = {
@@ -71,30 +71,29 @@ export function registerRoutes(app: Express): Server {
       const [member] = await db.insert(familyMembers).values(formattedData).returning();
 
       // If there are relationships, add them one by one
-      if (relationships && Array.isArray(relationships) && relationships.length > 0) {
-        const validRelationships = relationships.filter(
+      if (relationshipData && Array.isArray(relationshipData) && relationshipData.length > 0) {
+        const validRelationships = relationshipData.filter(
           rel => rel && rel.relatedPersonId && rel.relationType
         );
 
         // Insert each relationship individually
         for (const rel of validRelationships) {
-          const relData = {
+          // Insert the primary relationship
+          await db.insert(relationships).values({
             fromMemberId: member.id,
             toMemberId: parseInt(rel.relatedPersonId),
             relationType: rel.relationType,
             createdAt: new Date()
-          };
-          await db.insert(relationships).values(relData);
+          });
 
           // For spouse relationships, create the reciprocal relationship
           if (rel.relationType === 'spouse') {
-            const reciprocalData = {
+            await db.insert(relationships).values({
               fromMemberId: parseInt(rel.relatedPersonId),
               toMemberId: member.id,
               relationType: 'spouse',
               createdAt: new Date()
-            };
-            await db.insert(relationships).values(reciprocalData);
+            });
           }
         }
       }
