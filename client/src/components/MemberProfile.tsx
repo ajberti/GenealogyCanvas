@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FamilyMember } from "@/lib/types";
 import DocumentViewer from "./DocumentViewer";
 import StoryGenerator from "./StoryGenerator";
@@ -38,6 +38,11 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Get all family members for the relationships dropdown
+  const { data: familyMembers = [] } = useQuery<FamilyMember[]>({
+    queryKey: ["/api/family-members"],
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -201,7 +206,7 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                 setShowEditDialog(false);
                 onClose();
               }}
-              existingMembers={[]}
+              existingMembers={familyMembers}
             />
           </DialogContent>
         </Dialog>

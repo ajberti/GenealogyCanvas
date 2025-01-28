@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,14 +61,14 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
 
   const currentRelationships = member?.relationships?.map(rel => ({
     relatedPersonId: String(rel.relatedPersonId),
-    relationType: rel.relationType,
+    relationType: rel.relationType as "parent" | "child" | "spouse",
   })) || [];
 
-  const defaultValues = member
+  const defaultValues: FormValues = member
     ? {
         firstName: member.firstName,
         lastName: member.lastName,
-        gender: member.gender,
+        gender: member.gender as "male" | "female" | "other",
         birthPlace: member.birthPlace || "",
         currentLocation: member.currentLocation || "",
         bio: member.bio || "",
@@ -79,7 +79,7 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
     : {
         firstName: "",
         lastName: "",
-        gender: undefined,
+        gender: "male" as const,
         birthPlace: "",
         currentLocation: "",
         bio: "",
@@ -93,7 +93,7 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
     defaultValues,
   });
 
-  const { fields, append, remove } = form.useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     name: "relationships",
     control: form.control,
   });
@@ -276,7 +276,7 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ relatedPersonId: "", relationType: undefined })}
+                  onClick={() => append({ relatedPersonId: "", relationType: "parent" as const })}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Relationship
