@@ -70,21 +70,32 @@ export function registerRoutes(app: Express): Server {
       // Insert the new family member
       const [member] = await db.insert(familyMembers).values(formattedData).returning();
 
-      // If there are relationships, add them
+      // If there are relationships, add them one by one
       if (relationships && Array.isArray(relationships) && relationships.length > 0) {
         const validRelationships = relationships.filter(
           rel => rel && rel.relatedPersonId && rel.relationType
         );
 
-        if (validRelationships.length > 0) {
-          const relationshipValues = validRelationships.map(rel => ({
+        // Insert each relationship individually
+        for (const rel of validRelationships) {
+          const relData = {
             fromMemberId: member.id,
             toMemberId: parseInt(rel.relatedPersonId),
             relationType: rel.relationType,
             createdAt: new Date()
-          }));
+          };
+          await db.insert(relationships).values(relData);
 
-          await db.insert(relationships).values(relationshipValues);
+          // For spouse relationships, create the reciprocal relationship
+          if (rel.relationType === 'spouse') {
+            const reciprocalData = {
+              fromMemberId: parseInt(rel.relatedPersonId),
+              toMemberId: member.id,
+              relationType: 'spouse',
+              createdAt: new Date()
+            };
+            await db.insert(relationships).values(reciprocalData);
+          }
         }
       }
 
