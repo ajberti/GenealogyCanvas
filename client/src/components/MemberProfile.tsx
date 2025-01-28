@@ -17,7 +17,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FamilyMember } from "@/lib/types";
 import DocumentViewer from "./DocumentViewer";
-import StoryGenerator from "./StoryGenerator";
 import MemberForm from "./MemberForm";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -150,8 +149,6 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                   </div>
                 </CardContent>
               </Card>
-
-              <StoryGenerator member={member} />
 
               {member.documents && member.documents.length > 0 && (
                 <Card>
