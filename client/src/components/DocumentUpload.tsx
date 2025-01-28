@@ -35,12 +35,13 @@ const documentSchema = z.object({
   documentType: z.enum(["photo", "certificate", "record"], {
     required_error: "Please select a document type",
   }),
-  file: z
-    .instanceof(FileList)
-    .refine((files) => files.length > 0, "File is required")
-    .refine((files) => files[0]?.size <= MAX_FILE_SIZE, "Max file size is 5MB")
+  file: z.any().refine((files) => files?.length > 0, "File is required")
     .refine(
-      (files) => ACCEPTED_FILE_TYPES.includes(files[0]?.type),
+      (files) => files?.[0]?.size <= MAX_FILE_SIZE,
+      "Max file size is 5MB"
+    )
+    .refine(
+      (files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type),
       "Only .jpg, .jpeg, .png, .gif and .pdf files are accepted"
     ),
   description: z.string().optional(),
@@ -77,7 +78,7 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
       formData.append("title", data.title);
       formData.append("documentType", data.documentType);
       if (data.description) formData.append("description", data.description);
-      if (data.file[0]) formData.append("file", data.file[0]);
+      if (data.file?.[0]) formData.append("file", data.file[0]);
 
       const res = await fetch("/api/documents", {
         method: "POST",
@@ -180,7 +181,7 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
               <FormField
                 control={form.control}
                 name="file"
-                render={({ field: { onChange, ...field } }) => (
+                render={({ field: { onChange, value, ...field } }) => (
                   <FormItem>
                     <FormLabel>Upload File</FormLabel>
                     <FormControl>
