@@ -102,8 +102,8 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
     mutationFn: async (data: FormValues) => {
       const formattedData = {
         ...data,
-        birthDate: data.birthDate ? new Date(data.birthDate) : null,
-        deathDate: data.deathDate ? new Date(data.deathDate) : null,
+        birthDate: data.birthDate ? new Date(data.birthDate).toISOString() : null,
+        deathDate: data.deathDate ? new Date(data.deathDate).toISOString() : null,
       };
 
       const url = member ? `/api/family-members/${member.id}` : "/api/family-members";
@@ -114,7 +114,11 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         body: JSON.stringify(formattedData),
       });
 
-      if (!res.ok) throw new Error("Failed to save member");
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to save member");
+      }
+
       return res.json();
     },
     onSuccess: () => {
@@ -124,6 +128,13 @@ export default function MemberForm({ member, onClose, existingMembers = [] }: Me
         description: "The family tree has been updated",
       });
       onClose();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
