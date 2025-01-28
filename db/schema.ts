@@ -23,29 +23,19 @@ export const relationships = pgTable("relationships", {
   relationType: text("relation_type").notNull(),
   createdAt: timestamp("created_at").default(sql`NOW()`),
 }, (table) => ({
-  // Ensure unique combinations of personId and relatedPersonId for each relation type
   uniqueIdx: uniqueIndex("unique_relationship_idx").on(table.personId, table.relatedPersonId, table.relationType),
-  // Strengthen the self-relationship prevention with an explicit inequality check
   selfRelationCheck: sql`CONSTRAINT prevent_self_relation CHECK ((person_id <> related_person_id) IS TRUE)`,
 }));
 
-export const documents = pgTable("documents", {
-  id: serial("id").primaryKey(),
-  familyMemberId: integer("family_member_id").notNull().references(() => familyMembers.id, { onDelete: 'cascade' }),
-  title: text("title").notNull(),
-  documentType: text("document_type").notNull(),
-  fileUrl: text("file_url").notNull(),
-  description: text("description"),
-  uploadDate: timestamp("upload_date").default(sql`NOW()`),
-});
-
 // Define relations
-export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
-  relationships: many(relationships),
-  documents: many(documents),
+export const familyMembersRelations = relations(familyMembers, ({ many }) => ({
+  outgoingRelations: many(relationships, {
+    fields: [familyMembers.id],
+    references: [relationships.personId],
+  }),
 }));
 
-export const relationshipRelations = relations(relationships, ({ one }) => ({
+export const relationshipsRelations = relations(relationships, ({ one }) => ({
   person: one(familyMembers, {
     fields: [relationships.personId],
     references: [familyMembers.id],
@@ -56,18 +46,10 @@ export const relationshipRelations = relations(relationships, ({ one }) => ({
   }),
 }));
 
-export const documentRelations = relations(documents, ({ one }) => ({
-  familyMember: one(familyMembers, {
-    fields: [documents.familyMemberId],
-    references: [familyMembers.id],
-  }),
-}));
-
 // Export types and schemas
 export type FamilyMember = typeof familyMembers.$inferSelect;
 export type NewFamilyMember = typeof familyMembers.$inferInsert;
 export type Relationship = typeof relationships.$inferSelect;
-export type Document = typeof documents.$inferSelect;
 
 export const insertFamilyMemberSchema = createInsertSchema(familyMembers);
 export const selectFamilyMemberSchema = createSelectSchema(familyMembers);
