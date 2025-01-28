@@ -9,7 +9,7 @@ export interface FamilyMember {
   currentLocation?: string;
   bio?: string;
   relationships?: Relationship[];
-  documents?: Document[];
+  timelineEvents?: TimelineEvent[];
 }
 
 export interface Relationship {
@@ -18,6 +18,18 @@ export interface Relationship {
   relatedPersonId: number;
   relationType: 'parent' | 'child' | 'spouse';
   relatedPerson?: FamilyMember;
+}
+
+export interface TimelineEvent {
+  id: number;
+  familyMemberId: number;
+  title: string;
+  description?: string;
+  eventDate: Date;
+  location?: string;
+  eventType: 'birth' | 'marriage' | 'education' | 'career' | 'death' | 'other';
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Document {

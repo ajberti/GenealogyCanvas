@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { familyMembers, relationships } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { familyMembers, relationships, timelineEvents } from "@db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import express from 'express';
 import OpenAI from "openai";
 
@@ -25,7 +25,8 @@ export function registerRoutes(app: Express): Server {
             with: {
               toMember: true
             }
-          }
+          },
+          timelineEvents: true
         }
       });
 
@@ -38,7 +39,8 @@ export function registerRoutes(app: Express): Server {
           relatedPersonId: rel.toMemberId,
           relationType: rel.relationType,
           relatedPerson: rel.toMember
-        }))
+        })),
+        timelineEvents: member.timelineEvents
       }));
 
       res.json(formattedMembers);
@@ -79,7 +81,8 @@ export function registerRoutes(app: Express): Server {
             with: {
               toMember: true
             }
-          }
+          },
+          timelineEvents: true
         }
       });
 
@@ -90,7 +93,8 @@ export function registerRoutes(app: Express): Server {
           relatedPersonId: rel.toMemberId,
           relationType: rel.relationType,
           relatedPerson: rel.toMember
-        }))
+        })),
+        timelineEvents: newMember?.timelineEvents
       });
     } catch (error) {
       console.error('Error creating family member:', error);
@@ -148,7 +152,8 @@ export function registerRoutes(app: Express): Server {
             with: {
               toMember: true
             }
-          }
+          },
+          timelineEvents: true
         }
       });
 
@@ -159,7 +164,8 @@ export function registerRoutes(app: Express): Server {
           relatedPersonId: rel.toMemberId,
           relationType: rel.relationType,
           relatedPerson: rel.toMember
-        }))
+        })),
+        timelineEvents: updatedMember?.timelineEvents
       });
     } catch (error) {
       console.error('Error updating family member:', error);
@@ -259,6 +265,42 @@ export function registerRoutes(app: Express): Server {
         },
       ]);
 
+      // Add timeline events
+      await db.insert(timelineEvents).values([
+        {
+          familyMemberId: grandfather.id,
+          title: "Graduated University",
+          description: "Graduated from Oxford University with honors in Engineering",
+          eventDate: new Date("1962-06-15"),
+          location: "Oxford",
+          eventType: "education",
+        },
+        {
+          familyMemberId: grandfather.id,
+          title: "Marriage",
+          description: "Married Mary in a beautiful ceremony",
+          eventDate: new Date("1964-08-20"),
+          location: "London",
+          eventType: "marriage",
+        },
+        {
+          familyMemberId: grandmother.id,
+          title: "Started Teaching Career",
+          description: "Began teaching at London Primary School",
+          eventDate: new Date("1963-09-01"),
+          location: "London",
+          eventType: "career",
+        },
+        {
+          familyMemberId: father.id,
+          title: "First Job",
+          description: "Started working at Thames Engineering",
+          eventDate: new Date("1987-07-01"),
+          location: "London",
+          eventType: "career",
+        },
+      ]);
+
       res.json({ success: true, message: "Sample data seeded successfully" });
     } catch (error) {
       console.error("Error seeding data:", error);
@@ -329,6 +371,74 @@ export function registerRoutes(app: Express): Server {
 
   // Add static file serving for uploads
   app.use('/uploads', express.static('uploads'));
+
+  // Timeline Events
+  app.get("/api/family-members/:id/timeline", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const events = await db.query.timelineEvents.findMany({
+        where: eq(timelineEvents.familyMemberId, parseInt(id)),
+        orderBy: [desc(timelineEvents.eventDate)]
+      });
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching timeline events:', error);
+      res.status(500).json({ message: "Failed to fetch timeline events" });
+    }
+  });
+
+  app.post("/api/family-members/:id/timeline", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const eventData = {
+        ...req.body,
+        familyMemberId: parseInt(id),
+        eventDate: new Date(req.body.eventDate)
+      };
+
+      const [event] = await db.insert(timelineEvents)
+        .values(eventData)
+        .returning();
+
+      res.json(event);
+    } catch (error) {
+      console.error('Error creating timeline event:', error);
+      res.status(500).json({ message: "Failed to create timeline event" });
+    }
+  });
+
+  app.put("/api/timeline-events/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const eventData = {
+        ...req.body,
+        eventDate: new Date(req.body.eventDate),
+        updatedAt: new Date()
+      };
+
+      const [event] = await db.update(timelineEvents)
+        .set(eventData)
+        .where(eq(timelineEvents.id, parseInt(id)))
+        .returning();
+
+      res.json(event);
+    } catch (error) {
+      console.error('Error updating timeline event:', error);
+      res.status(500).json({ message: "Failed to update timeline event" });
+    }
+  });
+
+  app.delete("/api/timeline-events/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(timelineEvents)
+        .where(eq(timelineEvents.id, parseInt(id)));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting timeline event:', error);
+      res.status(500).json({ message: "Failed to delete timeline event" });
+    }
+  });
 
   return httpServer;
 }

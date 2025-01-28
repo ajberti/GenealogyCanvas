@@ -34,12 +34,31 @@ export const relationships = pgTable("relationships", {
   ),
 }));
 
+export const timelineEvents = pgTable("timeline_events", {
+  id: serial("id").primaryKey(),
+  familyMemberId: integer("family_member_id")
+    .notNull()
+    .references(() => familyMembers.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  description: text("description"),
+  eventDate: timestamp("event_date").notNull(),
+  location: text("location"),
+  eventType: text("event_type").notNull(), // e.g., 'birth', 'marriage', 'education', 'career', 'death'
+  createdAt: timestamp("created_at").default(sql`NOW()`),
+  updatedAt: timestamp("updated_at").default(sql`NOW()`),
+});
+
 // Define relations
 export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
   fromRelationships: many(relationships, {
     relationName: "fromMemberRelations",
     fields: [familyMembers.id],
     references: [relationships.fromMemberId],
+  }),
+  timelineEvents: many(timelineEvents, {
+    relationName: "memberTimelineEvents",
+    fields: [familyMembers.id],
+    references: [timelineEvents.familyMemberId],
   }),
 }));
 
@@ -56,10 +75,22 @@ export const relationshipRelations = relations(relationships, ({ one }) => ({
   }),
 }));
 
+export const timelineEventRelations = relations(timelineEvents, ({ one }) => ({
+  member: one(familyMembers, {
+    relationName: "memberTimelineEvents",
+    fields: [timelineEvents.familyMemberId],
+    references: [familyMembers.id],
+  }),
+}));
+
 // Export types and schemas
 export type FamilyMember = typeof familyMembers.$inferSelect;
 export type NewFamilyMember = typeof familyMembers.$inferInsert;
 export type Relationship = typeof relationships.$inferSelect;
+export type TimelineEvent = typeof timelineEvents.$inferSelect;
+export type NewTimelineEvent = typeof timelineEvents.$inferInsert;
 
 export const insertFamilyMemberSchema = createInsertSchema(familyMembers);
 export const selectFamilyMemberSchema = createSelectSchema(familyMembers);
+export const insertTimelineEventSchema = createInsertSchema(timelineEvents);
+export const selectTimelineEventSchema = createSelectSchema(timelineEvents);
