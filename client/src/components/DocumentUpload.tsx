@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import type { FamilyMember, Document } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import DocumentViewer from "./DocumentViewer";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const documentSchema = z.object({
+  memberId: z.string().min(1, "Please select a family member"),
+  title: z.string().min(1, "Title is required"),
+  documentType: z.enum(["photo", "certificate", "record"], {
+    required_error: "Please select a document type",
+  }),
+  fileUrl: z.string().url("Please enter a valid URL"),
+  description: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof documentSchema>;
 
 interface DocumentUploadProps {
   members: FamilyMember[];
@@ -29,12 +52,25 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
     ? members.find(m => m.id === selectedMember)?.documents || []
     : [];
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(documentSchema),
+    defaultValues: {
+      title: "",
+      documentType: undefined,
+      fileUrl: "",
+      description: "",
+    },
+  });
+
   const mutation = useMutation({
-    mutationFn: async (data: Partial<Document>) => {
+    mutationFn: async (data: FormValues) => {
       const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          familyMemberId: Number(data.memberId),
+        }),
       });
 
       if (!res.ok) throw new Error("Failed to upload document");
@@ -46,20 +82,12 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
         title: "Document uploaded",
         description: "The document has been added to the family archive",
       });
+      form.reset();
     },
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-
-    mutation.mutate({
-      familyMemberId: Number(formData.get("memberId")),
-      title: formData.get("title") as string,
-      documentType: formData.get("documentType") as "photo" | "certificate" | "record",
-      fileUrl: formData.get("fileUrl") as string,
-      description: formData.get("description") as string,
-    });
+  const onSubmit = (data: FormValues) => {
+    mutation.mutate(data);
   };
 
   return (
@@ -68,59 +96,109 @@ export default function DocumentUpload({ members }: DocumentUploadProps) {
         <CardContent className="p-6">
           <h2 className="text-2xl font-serif mb-6">Upload Family Document</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="memberId">Family Member</Label>
-              <Select
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
                 name="memberId"
-                onValueChange={(value) => setSelectedMember(Number(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select family member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {members.map((member) => (
-                    <SelectItem key={member.id} value={String(member.id)}>
-                      {member.firstName} {member.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Family Member</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedMember(Number(value));
+                      }}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select family member" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {members.map((member) => (
+                          <SelectItem key={member.id} value={String(member.id)}>
+                            {member.firstName} {member.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-2">
-              <Label htmlFor="title">Document Title</Label>
-              <Input id="title" name="title" required />
-            </div>
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Document Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-2">
-              <Label htmlFor="documentType">Document Type</Label>
-              <Select name="documentType">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="photo">Photo</SelectItem>
-                  <SelectItem value="certificate">Certificate</SelectItem>
-                  <SelectItem value="record">Record</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <FormField
+                control={form.control}
+                name="documentType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Document Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="photo">Photo</SelectItem>
+                        <SelectItem value="certificate">Certificate</SelectItem>
+                        <SelectItem value="record">Record</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-2">
-              <Label htmlFor="fileUrl">File URL</Label>
-              <Input id="fileUrl" name="fileUrl" type="url" required />
-            </div>
+              <FormField
+                control={form.control}
+                name="fileUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>File URL</FormLabel>
+                    <FormControl>
+                      <Input type="url" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" />
-            </div>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <Button type="submit" className="w-full">
-              Upload Document
-            </Button>
-          </form>
+              <Button type="submit" className="w-full">
+                Upload Document
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 
