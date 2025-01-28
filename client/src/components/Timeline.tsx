@@ -23,7 +23,8 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
       member.timelineEvents?.forEach(event => {
         allEvents.push({
           ...event,
-          member
+          member,
+          eventDate: new Date(event.eventDate) // Convert string to Date object
         });
       });
 
@@ -36,7 +37,7 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
           description: `Born in ${member.birthPlace || 'unknown location'}`,
           eventDate: new Date(member.birthDate),
           location: member.birthPlace,
-          eventType: 'birth',
+          eventType: 'birth' as const,
           createdAt: new Date(),
           updatedAt: new Date(),
           member
@@ -52,7 +53,7 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
           description: `Passed away in ${member.currentLocation || 'unknown location'}`,
           eventDate: new Date(member.deathDate),
           location: member.currentLocation,
-          eventType: 'death',
+          eventType: 'death' as const,
           createdAt: new Date(),
           updatedAt: new Date(),
           member
