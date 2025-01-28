@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
@@ -22,6 +22,13 @@ export const relationships = pgTable("relationships", {
   relatedPersonId: integer("related_person_id").notNull().references(() => familyMembers.id, { onDelete: 'cascade' }),
   relationType: text("relation_type").notNull(),
   createdAt: timestamp("created_at").default(sql`NOW()`),
+}, (table) => {
+  return {
+    // Ensure unique combinations of personId and relatedPersonId for each relation type
+    uniqueIdx: uniqueIndex("unique_relationship_idx").on(table.personId, table.relatedPersonId, table.relationType),
+    // Prevent self-relationships with a simple CHECK constraint
+    selfRelationCheck: sql`CONSTRAINT prevent_self_relation CHECK (person_id <> related_person_id)`,
+  };
 });
 
 export const documents = pgTable("documents", {
