@@ -62,10 +62,11 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .append("g")
       .attr("transform", `translate(${width/2},50)`);
 
+    // Increased node sizing and adjusted separation
     const tree = d3.tree<TreeNode>()
-      .nodeSize([80, 160])
+      .nodeSize([120, 200]) // Increased from [80, 160]
       .separation((a: d3.HierarchyNode<TreeNode>, b: d3.HierarchyNode<TreeNode>) => {
-        return a.parent === b.parent ? 1 : 1.2;
+        return a.parent === b.parent ? 1.5 : 2; // Increased separation values
       });
 
     const hierarchy = d3.hierarchy(root);
@@ -94,9 +95,10 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .attr("r", 5)
       .attr("fill", "hsl(25, 40%, 35%)");
 
+    // Adjusted text positioning and styling
     nodes.append("text")
       .attr("dy", "1.5em")
-      .attr("x", -30)
+      .attr("x", -40) // Increased from -30
       .attr("text-anchor", "middle")
       .text((d: D3TreeNode) => `${d.data.firstName} ${d.data.lastName}`)
       .attr("class", "text-sm font-serif");
