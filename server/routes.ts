@@ -1,11 +1,50 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { db } from "@db";
-import { familyMembers, relationships, timelineEvents } from "@db/schema";
-import { eq, desc } from "drizzle-orm";
+import { familyMembers, relationships, timelineEvents, documents } from "@db/schema";
+import { eq } from "drizzle-orm";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from 'express'; // Import express for static file serving
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), "uploads");
+    // Create uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
 
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
+
+  // Serve uploaded files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Add API prefix middleware to ensure all API routes are handled correctly
   app.use('/api', (req, res, next) => {
@@ -23,9 +62,9 @@ export function registerRoutes(app: Express): Server {
               toMember: true
             }
           },
-          timelineEvents: true
-        },
-        orderBy: [familyMembers.lastName, familyMembers.firstName]
+          timelineEvents: true,
+          documents: true
+        }
       });
 
       const formattedMembers = members.map(member => ({
@@ -44,6 +83,10 @@ export function registerRoutes(app: Express): Server {
           eventDate: event.eventDate.toISOString(),
           createdAt: event.createdAt.toISOString(),
           updatedAt: event.updatedAt.toISOString()
+        })),
+        documents: member.documents?.map(doc => ({
+          ...doc,
+          uploadDate: doc.uploadDate.toISOString()
         }))
       }));
 
@@ -54,6 +97,39 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Handle document upload
+  app.post("/api/documents", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { familyMemberId, title, documentType, description } = req.body;
+
+      // Create the file URL
+      const fileUrl = `/uploads/${req.file.filename}`;
+
+      // Store document metadata in database
+      const [document] = await db.insert(documents).values({
+        familyMemberId: parseInt(familyMemberId),
+        title,
+        documentType,
+        fileUrl,
+        description,
+        uploadDate: new Date(),
+      }).returning();
+
+      res.json({ 
+        success: true, 
+        message: "Document uploaded successfully",
+        document
+      });
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
   // Add seed data endpoint
   app.post("/api/seed", async (req, res) => {
     try {
@@ -61,6 +137,7 @@ export function registerRoutes(app: Express): Server {
       await db.delete(timelineEvents);
       await db.delete(relationships);
       await db.delete(familyMembers);
+      await db.delete(documents); //added this line to delete documents as well
 
       // Add sample family members
       const [grandfather] = await db.insert(familyMembers).values({

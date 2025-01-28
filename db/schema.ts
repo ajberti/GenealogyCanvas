@@ -1,5 +1,5 @@
 import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 export const familyMembers = pgTable("family_members", {
@@ -12,8 +12,8 @@ export const familyMembers = pgTable("family_members", {
   birthPlace: text("birth_place"),
   currentLocation: text("current_location"),
   bio: text("bio"),
-  createdAt: timestamp("created_at").default(sql`NOW()`).notNull(),
-  updatedAt: timestamp("updated_at").default(sql`NOW()`).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const relationships = pgTable("relationships", {
@@ -25,7 +25,7 @@ export const relationships = pgTable("relationships", {
     .notNull()
     .references(() => familyMembers.id, { onDelete: 'cascade' }),
   relationType: text("relation_type").notNull(),
-  createdAt: timestamp("created_at").default(sql`NOW()`).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const timelineEvents = pgTable("timeline_events", {
@@ -38,42 +38,36 @@ export const timelineEvents = pgTable("timeline_events", {
   eventDate: timestamp("event_date").notNull(),
   location: text("location"),
   eventType: text("event_type").notNull(),
-  createdAt: timestamp("created_at").default(sql`NOW()`).notNull(),
-  updatedAt: timestamp("updated_at").default(sql`NOW()`).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Define relations with explicit names
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  familyMemberId: integer("family_member_id")
+    .notNull()
+    .references(() => familyMembers.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  documentType: text("document_type").notNull(),
+  fileUrl: text("file_url").notNull(),
+  description: text("description"),
+  uploadDate: timestamp("upload_date").notNull().defaultNow(),
+});
+
 export const familyMemberRelations = relations(familyMembers, ({ many }) => ({
-  fromRelationships: many(relationships, {
-    relationName: "memberFromRelations",
-    fields: [familyMembers.id],
-    references: [relationships.fromMemberId]
-  }),
-  timelineEvents: many(timelineEvents, {
-    relationName: "memberTimelineEvents",
-    fields: [familyMembers.id],
-    references: [timelineEvents.familyMemberId]
-  }),
+  fromRelationships: many(relationships),
+  timelineEvents: many(timelineEvents),
+  documents: many(documents),
 }));
 
 export const relationshipRelations = relations(relationships, ({ one }) => ({
   fromMember: one(familyMembers, {
-    relationName: "memberFromRelations",
     fields: [relationships.fromMemberId],
-    references: [familyMembers.id]
+    references: [familyMembers.id],
   }),
   toMember: one(familyMembers, {
-    relationName: "memberToRelations",
     fields: [relationships.toMemberId],
-    references: [familyMembers.id]
-  }),
-}));
-
-export const timelineEventRelations = relations(timelineEvents, ({ one }) => ({
-  familyMember: one(familyMembers, {
-    relationName: "memberTimelineEvents",
-    fields: [timelineEvents.familyMemberId],
-    references: [familyMembers.id]
+    references: [familyMembers.id],
   }),
 }));
 
@@ -83,8 +77,12 @@ export type NewFamilyMember = typeof familyMembers.$inferInsert;
 export type Relationship = typeof relationships.$inferSelect;
 export type TimelineEvent = typeof timelineEvents.$inferSelect;
 export type NewTimelineEvent = typeof timelineEvents.$inferInsert;
+export type Document = typeof documents.$inferSelect;
+export type NewDocument = typeof documents.$inferInsert;
 
 export const insertFamilyMemberSchema = createInsertSchema(familyMembers);
 export const selectFamilyMemberSchema = createSelectSchema(familyMembers);
 export const insertTimelineEventSchema = createInsertSchema(timelineEvents);
 export const selectTimelineEventSchema = createSelectSchema(timelineEvents);
+export const insertDocumentSchema = createInsertSchema(documents);
+export const selectDocumentSchema = createSelectSchema(documents);
