@@ -106,6 +106,72 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add update endpoint right after the create endpoint
+  app.put("/api/family-members/:id", async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const { relationships, birthDate, deathDate, ...memberData } = req.body;
+
+      // Convert string dates to Date objects for database update
+      const formattedData = {
+        ...memberData,
+        birthDate: birthDate ? new Date(birthDate) : null,
+        deathDate: deathDate ? new Date(deathDate) : null,
+        updatedAt: new Date(),
+      };
+
+      // Update the family member
+      const [member] = await db
+        .update(familyMembers)
+        .set(formattedData)
+        .where(eq(familyMembers.id, memberId))
+        .returning();
+
+      if (!member) {
+        return res.status(404).json({ message: "Family member not found" });
+      }
+
+      // Delete existing relationships for this member
+      await db
+        .delete(relationships)
+        .where(eq(relationships.fromMemberId, memberId));
+
+      // If there are relationships, add them one by one
+      if (relationships && Array.isArray(relationships) && relationships.length > 0) {
+        const validRelationships = relationships.filter(
+          rel => rel && rel.relatedPersonId && rel.relationType
+        );
+
+        // Insert each relationship individually
+        for (const rel of validRelationships) {
+          const relData = {
+            fromMemberId: member.id,
+            toMemberId: parseInt(rel.relatedPersonId),
+            relationType: rel.relationType,
+            createdAt: new Date()
+          };
+          await db.insert(relationships).values(relData);
+
+          // For spouse relationships, create the reciprocal relationship
+          if (rel.relationType === 'spouse') {
+            const reciprocalData = {
+              fromMemberId: parseInt(rel.relatedPersonId),
+              toMemberId: member.id,
+              relationType: 'spouse',
+              createdAt: new Date()
+            };
+            await db.insert(relationships).values(reciprocalData);
+          }
+        }
+      }
+
+      res.json(member);
+    } catch (error) {
+      console.error('Error updating family member:', error);
+      res.status(500).json({ message: "Failed to update family member" });
+    }
+  });
+
   // Get all family members with relationships and timeline events
   app.get("/api/family-members", async (req, res) => {
     try {
