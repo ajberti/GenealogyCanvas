@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
@@ -26,7 +26,9 @@ export const relationships = pgTable("relationships", {
     .references(() => familyMembers.id, { onDelete: 'cascade' }),
   relationType: text("relation_type").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueRelation: unique().on(table.fromMemberId, table.toMemberId, table.relationType)
+}));
 
 export const timelineEvents = pgTable("timeline_events", {
   id: serial("id").primaryKey(),
