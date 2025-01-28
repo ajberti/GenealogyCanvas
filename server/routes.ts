@@ -110,7 +110,7 @@ export function registerRoutes(app: Express): Server {
   app.put("/api/family-members/:id", async (req, res) => {
     try {
       const memberId = parseInt(req.params.id);
-      const { relationships, birthDate, deathDate, ...memberData } = req.body;
+      const { relationships: relationshipData, birthDate, deathDate, ...memberData } = req.body;
 
       // Convert string dates to Date objects for database update
       const formattedData = {
@@ -121,51 +121,48 @@ export function registerRoutes(app: Express): Server {
       };
 
       // Update the family member
-      const [member] = await db
+      const [updatedMember] = await db
         .update(familyMembers)
         .set(formattedData)
         .where(eq(familyMembers.id, memberId))
         .returning();
 
-      if (!member) {
+      if (!updatedMember) {
         return res.status(404).json({ message: "Family member not found" });
       }
 
-      // Delete existing relationships for this member
-      await db
-        .delete(relationships)
+      // Delete existing relationships
+      await db.delete(relationships)
         .where(eq(relationships.fromMemberId, memberId));
 
-      // If there are relationships, add them one by one
-      if (relationships && Array.isArray(relationships) && relationships.length > 0) {
-        const validRelationships = relationships.filter(
+      // If there are new relationships, add them
+      if (relationshipData && Array.isArray(relationshipData) && relationshipData.length > 0) {
+        const validRelationships = relationshipData.filter(
           rel => rel && rel.relatedPersonId && rel.relationType
         );
 
-        // Insert each relationship individually
         for (const rel of validRelationships) {
-          const relData = {
-            fromMemberId: member.id,
+          // Insert the primary relationship
+          await db.insert(relationships).values({
+            fromMemberId: memberId,
             toMemberId: parseInt(rel.relatedPersonId),
             relationType: rel.relationType,
             createdAt: new Date()
-          };
-          await db.insert(relationships).values(relData);
+          });
 
           // For spouse relationships, create the reciprocal relationship
           if (rel.relationType === 'spouse') {
-            const reciprocalData = {
+            await db.insert(relationships).values({
               fromMemberId: parseInt(rel.relatedPersonId),
-              toMemberId: member.id,
+              toMemberId: memberId,
               relationType: 'spouse',
               createdAt: new Date()
-            };
-            await db.insert(relationships).values(reciprocalData);
+            });
           }
         }
       }
 
-      res.json(member);
+      res.json(updatedMember);
     } catch (error) {
       console.error('Error updating family member:', error);
       res.status(500).json({ message: "Failed to update family member" });
