@@ -64,6 +64,13 @@ export default function Home() {
         </TabsContent>
 
         <TabsContent value="members" className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-serif">Family Members</h2>
+            <Button onClick={handleAddMember}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Member
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {members.map((member) => (
               <div
