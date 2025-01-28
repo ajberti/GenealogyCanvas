@@ -23,7 +23,7 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
     const allEvents: TimelineEvent[] = [];
 
     members.forEach(member => {
-      // Add birth and death events
+      // Add birth events
       if (member.birthDate) {
         allEvents.push({
           date: new Date(member.birthDate),
@@ -31,6 +31,8 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
           member
         });
       }
+
+      // Add death events
       if (member.deathDate) {
         allEvents.push({
           date: new Date(member.deathDate),
@@ -52,6 +54,7 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
       });
     });
 
+    // Sort events by date
     return allEvents.sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [members]);
 
@@ -78,7 +81,7 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
 
   return (
     <div className="space-y-4 p-4">
-      {events.map((event, index) => (
+      {events.length > 0 ? events.map((event, index) => (
         <Card
           key={`${event.member.id}-${event.type}-${index}`}
           className="relative hover:shadow-lg transition-shadow cursor-pointer"
@@ -126,9 +129,7 @@ export default function Timeline({ members, onSelectMember, isLoading }: Timelin
             </div>
           </CardContent>
         </Card>
-      ))}
-
-      {events.length === 0 && (
+      )) : (
         <div className="text-center py-8 text-muted-foreground">
           No events to display. Add birth dates, death dates, or photos to family members to see them here.
         </div>

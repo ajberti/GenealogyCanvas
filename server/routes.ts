@@ -49,17 +49,34 @@ export function registerRoutes(app: Express): Server {
 
   // Family Members
   app.get("/api/family-members", async (req, res) => {
-    const members = await db.query.familyMembers.findMany({
-      with: {
-        relationships: {
-          with: {
-            relatedPerson: true,
+    try {
+      const members = await db.query.familyMembers.findMany({
+        with: {
+          relationships: {
+            with: {
+              relatedPerson: true,
+            },
           },
+          documents: true,
         },
-        documents: true,
-      },
-    });
-    res.json(members);
+      });
+
+      // Ensure dates are properly formatted
+      const formattedMembers = members.map(member => ({
+        ...member,
+        birthDate: member.birthDate ? new Date(member.birthDate).toISOString() : null,
+        deathDate: member.deathDate ? new Date(member.deathDate).toISOString() : null,
+        documents: member.documents?.map(doc => ({
+          ...doc,
+          uploadDate: doc.uploadDate ? new Date(doc.uploadDate).toISOString() : null,
+        })),
+      }));
+
+      res.json(formattedMembers);
+    } catch (error) {
+      console.error('Error fetching family members:', error);
+      res.status(500).json({ message: "Failed to fetch family members" });
+    }
   });
 
   app.post("/api/family-members", async (req, res) => {
