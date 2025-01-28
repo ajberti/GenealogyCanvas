@@ -1,6 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Image, FileArchive } from "lucide-react";
+import { FileText, Download, Image, FileArchive, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import type { Document } from "@/lib/types";
 
 interface DocumentViewerProps {
@@ -19,6 +21,26 @@ const getDocumentIcon = (type: string) => {
 };
 
 export default function DocumentViewer({ documents }: DocumentViewerProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      const res = await fetch(`/api/documents/${documentId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete document");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/family-members"] });
+      toast({
+        title: "Document deleted",
+        description: "The document has been removed successfully",
+      });
+    },
+  });
+
   const handleDownload = (fileUrl: string, title: string) => {
     const link = document.createElement('a');
     link.href = fileUrl;
@@ -65,6 +87,13 @@ export default function DocumentViewer({ documents }: DocumentViewerProps) {
                   onClick={() => handleDownload(doc.fileUrl, doc.title)}
                 >
                   <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deleteMutation.mutate(doc.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </div>
