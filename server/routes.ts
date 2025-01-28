@@ -71,15 +71,21 @@ export function registerRoutes(app: Express): Server {
       const [member] = await db.insert(familyMembers).values(formattedData).returning();
 
       // If there are relationships, add them
-      if (relationships && relationships.length > 0) {
-        const relationshipValues = relationships.map(rel => ({
-          fromMemberId: member.id,
-          toMemberId: parseInt(rel.relatedPersonId),
-          relationType: rel.relationType,
-          createdAt: new Date()
-        }));
+      if (relationships && Array.isArray(relationships) && relationships.length > 0) {
+        const validRelationships = relationships.filter(
+          rel => rel && rel.relatedPersonId && rel.relationType
+        );
 
-        await db.insert(relationships).values(relationshipValues);
+        if (validRelationships.length > 0) {
+          const relationshipValues = validRelationships.map(rel => ({
+            fromMemberId: member.id,
+            toMemberId: parseInt(rel.relatedPersonId),
+            relationType: rel.relationType,
+            createdAt: new Date()
+          }));
+
+          await db.insert(relationships).values(relationshipValues);
+        }
       }
 
       res.json(member);
