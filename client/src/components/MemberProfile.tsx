@@ -21,15 +21,15 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
 
   return (
     <Dialog open={!!member} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-serif">
             {member.firstName} {member.lastName}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
-          <div className="space-y-6 p-4">
+        <ScrollArea className="h-[calc(90vh-80px)] pr-4">
+          <div className="space-y-6">
             {/* Basic Information */}
             <Card>
               <CardContent className="p-6 space-y-4">
