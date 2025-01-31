@@ -9,12 +9,14 @@ import FamilyTree from "@/components/FamilyTree";
 import Timeline from "@/components/Timeline";
 import MemberProfile from "@/components/MemberProfile";
 import type { FamilyMember } from "@/lib/types";
+import AdminLogin from "@/components/AdminLogin";
 
 const VINTAGE_PAPER_BG = "https://images.unsplash.com/photo-1519972064555-542444e71b54";
 
 export default function Home() {
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [showingProfile, setShowingProfile] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   const { data: members = [], isLoading } = useQuery<FamilyMember[]>({
     queryKey: ["/api/family-members"],
@@ -38,9 +40,12 @@ export default function Home() {
             <h1 className="text-4xl font-serif text-primary mb-4 sm:mb-6">
               Family Heritage
             </h1>
-            <Link href="/admin">
-              <Button variant="outline">Admin Login</Button>
-            </Link>
+            <Button 
+              variant="outline"
+              onClick={() => setShowAdminLogin(true)}
+            >
+              Admin Login
+            </Button>
           </div>
 
           <Tabs defaultValue="tree" className="w-full">
@@ -131,6 +136,11 @@ export default function Home() {
         member={showingProfile ? selectedMember : null} 
         onClose={() => setShowingProfile(false)}
         readOnly={true}
+      />
+
+      <AdminLogin 
+        open={showAdminLogin}
+        onOpenChange={setShowAdminLogin}
       />
     </div>
   );
