@@ -14,6 +14,13 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Helper function to get the base URL
+function getBaseUrl(req: express.Request): string {
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  return `${protocol}://${host}`;
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -51,6 +58,72 @@ export function registerRoutes(app: Express): Server {
   app.use('/api', (req, res, next) => {
     res.setHeader('Content-Type', 'application/json');
     next();
+  });
+
+  // Handle document upload with full URL
+  app.post("/api/documents", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { familyMemberId, title, documentType, description } = req.body;
+
+      // Create the full file URL with base URL
+      const baseUrl = getBaseUrl(req);
+      const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+
+      // Store document metadata in database with full URL
+      const [document] = await db.insert(documents).values({
+        familyMemberId: parseInt(familyMemberId),
+        title,
+        documentType,
+        fileUrl,
+        description,
+        uploadDate: new Date(),
+      }).returning();
+
+      res.json({ 
+        success: true, 
+        message: "Document uploaded successfully",
+        document
+      });
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Update document deletion to handle full URLs
+  app.delete("/api/documents/:id", async (req, res) => {
+    try {
+      const documentId = parseInt(req.params.id);
+
+      // Get the document to find its file path
+      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
+
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Extract the filename from the full URL
+      const fileUrl = new URL(document.fileUrl);
+      const filename = path.basename(fileUrl.pathname);
+      const filePath = path.join(uploadDir, filename);
+
+      // Delete the physical file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      // Delete from database
+      await db.delete(documents).where(eq(documents.id, documentId));
+
+      res.json({ success: true, message: "Document deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      res.status(500).json({ message: "Failed to delete document" });
+    }
   });
 
   // Add family member
@@ -250,66 +323,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Handle document upload
-  app.post("/api/documents", upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const { familyMemberId, title, documentType, description } = req.body;
-
-      // Create the file URL
-      const fileUrl = `/uploads/${req.file.filename}`;
-
-      // Store document metadata in database
-      const [document] = await db.insert(documents).values({
-        familyMemberId: parseInt(familyMemberId),
-        title,
-        documentType,
-        fileUrl,
-        description,
-        uploadDate: new Date(),
-      }).returning();
-
-      res.json({ 
-        success: true, 
-        message: "Document uploaded successfully",
-        document
-      });
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      res.status(500).json({ message: "Failed to upload document" });
-    }
-  });
-
-  // Delete document endpoint
-  app.delete("/api/documents/:id", async (req, res) => {
-    try {
-      const documentId = parseInt(req.params.id);
-
-      // Get the document to find its file path
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
-
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-
-      // Delete the physical file
-      const filePath = path.join(process.cwd(), document.fileUrl.substring(1)); //remove leading /
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-
-      // Delete from database
-      await db.delete(documents).where(eq(documents.id, documentId));
-
-      res.json({ success: true, message: "Document deleted successfully" });
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      res.status(500).json({ message: "Failed to delete document" });
-    }
-  });
 
   // Add seed data endpoint
   app.post("/api/seed", async (req, res) => {
