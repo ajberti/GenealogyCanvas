@@ -7,6 +7,7 @@ import type { Document } from "@/lib/types";
 
 interface DocumentViewerProps {
   documents: Document[];
+  readOnly?: boolean;
 }
 
 const getDocumentIcon = (type: string) => {
@@ -20,7 +21,7 @@ const getDocumentIcon = (type: string) => {
   }
 };
 
-export default function DocumentViewer({ documents }: DocumentViewerProps) {
+export default function DocumentViewer({ documents, readOnly = false }: DocumentViewerProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -88,13 +89,15 @@ export default function DocumentViewer({ documents }: DocumentViewerProps) {
                 >
                   <Download className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => deleteMutation.mutate(doc.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {!readOnly && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteMutation.mutate(doc.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
