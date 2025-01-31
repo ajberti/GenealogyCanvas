@@ -24,6 +24,7 @@ import { format } from "date-fns";
 interface MemberProfileProps {
   member: FamilyMember | null;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
 const formatDate = (date: Date | undefined) => {
@@ -31,7 +32,7 @@ const formatDate = (date: Date | undefined) => {
   return format(new Date(date), 'MMMM d, yyyy');
 };
 
-export default function MemberProfile({ member, onClose }: MemberProfileProps) {
+export default function MemberProfile({ member, onClose, readOnly = false }: MemberProfileProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const queryClient = useQueryClient();
@@ -75,22 +76,24 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
             <DialogTitle className="text-2xl font-serif">
               {member.firstName} {member.lastName}
             </DialogTitle>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowEditDialog(true)}
-              >
-                <Edit2 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowEditDialog(true)}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </DialogHeader>
 
           <ScrollArea className="h-[calc(90vh-80px)] pr-4">
@@ -154,7 +157,7 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
                 <Card>
                   <CardContent className="p-6">
                     <h3 className="text-lg font-medium mb-4">Family Documents</h3>
-                    <DocumentViewer documents={member.documents} />
+                    <DocumentViewer documents={member.documents} readOnly={readOnly} />
                   </CardContent>
                 </Card>
               )}
@@ -163,42 +166,46 @@ export default function MemberProfile({ member, onClose }: MemberProfileProps) {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete {member.firstName} {member.lastName}
-              and all associated data from the family tree.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {!readOnly && (
+        <>
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete {member.firstName} {member.lastName}
+                  and all associated data from the family tree.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      {showEditDialog && (
-        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="max-w-3xl h-[90vh]">
-            <ScrollArea className="h-[calc(90vh-40px)]">
-              <MemberForm
-                member={member}
-                onClose={() => {
-                  setShowEditDialog(false);
-                  onClose();
-                }}
-                existingMembers={familyMembers}
-              />
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+          {showEditDialog && (
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+              <DialogContent className="max-w-3xl h-[90vh]">
+                <ScrollArea className="h-[calc(90vh-40px)]">
+                  <MemberForm
+                    member={member}
+                    onClose={() => {
+                      setShowEditDialog(false);
+                      onClose();
+                    }}
+                    existingMembers={familyMembers}
+                  />
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+          )}
+        </>
       )}
     </>
   );
