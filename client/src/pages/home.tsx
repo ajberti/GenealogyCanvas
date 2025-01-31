@@ -36,19 +36,19 @@ export default function Home() {
 
   return (
     <div 
-      className="min-h-screen bg-cover bg-center p-6"
+      className="min-h-screen bg-cover bg-center p-2 sm:p-6"
       style={{
         backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(${VINTAGE_PAPER_BG})`,
       }}
     >
       <Card className="max-w-7xl mx-auto bg-white/80 backdrop-blur">
-        <CardContent className="p-6">
-          <h1 className="text-4xl font-serif text-primary mb-6 text-center">
+        <CardContent className="p-2 sm:p-6">
+          <h1 className="text-4xl font-serif text-primary mb-4 sm:mb-6 text-center">
             Family Heritage
           </h1>
 
           <Tabs defaultValue="tree" className="w-full">
-            <TabsList className="w-full justify-center mb-6">
+            <TabsList className="w-full justify-center mb-4 sm:mb-6">
               <TabsTrigger value="tree">Family Tree</TabsTrigger>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
@@ -56,7 +56,7 @@ export default function Home() {
             </TabsList>
 
             <TabsContent value="tree">
-              <div className="h-[600px] border rounded-lg bg-white/50 p-4">
+              <div className="h-[calc(100vh-200px)] sm:h-[600px] border rounded-lg bg-white/50 p-2 sm:p-4">
                 <FamilyTree
                   members={members}
                   onSelectMember={handleMemberClick}

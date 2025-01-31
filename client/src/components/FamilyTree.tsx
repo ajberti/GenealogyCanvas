@@ -164,7 +164,7 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
   }
 
   return (
-    <Card className="w-full h-[600px]">
+    <Card className="w-full h-full">
       <ScrollArea className="h-full w-full" orientation="both">
         <div className="relative w-full h-full min-w-[1200px] min-h-[800px]">
           <svg
