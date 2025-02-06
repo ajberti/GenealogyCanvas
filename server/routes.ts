@@ -10,7 +10,9 @@ import express from 'express';
 
 import { Client } from '@replit/object-storage';
 
-const client = new Client();
+const client = new Client({
+  bucketName: process.env.REPLIT_BUCKET_NAME || "family-archive"
+});
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
