@@ -53,7 +53,7 @@ export function registerRoutes(app: Express): Server {
       const filename = `${uniqueSuffix}-${req.file.originalname}`;
 
       // Upload to Object Storage
-      const { ok, error } = await client.uploadFromBuffer(filename, req.file.buffer);
+      const { ok, error } = await client.uploadFromMemory(filename, req.file.buffer);
       if (!ok) {
         console.error('Error uploading to Object Storage:', error);
         return res.status(500).json({ message: "Failed to upload file" });
