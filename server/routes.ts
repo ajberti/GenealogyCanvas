@@ -59,17 +59,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ message: "Failed to upload file" });
       }
 
-      // Generate a unique local filename
-      const localPath = path.join('uploads', filename);
-
-      // Download the file locally
-      const { ok: downloadOk } = await client.downloadToFilename(filename, localPath);
-      if (!downloadOk) {
-        return res.status(500).json({ message: "Failed to process file" });
+      // Get download URL for the file
+      const { ok: urlOk, value: fileUrl } = await client.getDownloadUrl(filename);
+      if (!urlOk) {
+        return res.status(500).json({ message: "Failed to generate file URL" });
       }
-
-      // Create URL for the downloaded file
-      const fileUrl = `/uploads/${filename}`;
 
 
       // Store document metadata in database with signed URL
