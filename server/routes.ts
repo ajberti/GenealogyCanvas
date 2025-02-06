@@ -59,9 +59,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ message: "Failed to upload file" });
       }
 
-      // Get download URL for the file
-      const { ok: urlOk, value: fileUrl } = await client.getDownloadUrl(filename);
+      // Get download URL by downloading and re-uploading as text
+      const { ok: downloadOk, value: fileContent } = await client.downloadAsText(filename);
+      if (!downloadOk) {
+        return res.status(500).json({ message: "Failed to process file" });
+      }
 
+      const { ok: urlOk, value: fileUrl } = await client.uploadFromText(filename, fileContent);
       if (!urlOk) {
         return res.status(500).json({ message: "Failed to generate file URL" });
       }
