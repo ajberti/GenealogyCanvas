@@ -30,8 +30,8 @@ const upload = multer({
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
 
-  // Serve uploaded files - Removed as we use object storage now.
-  //app.use('/uploads', express.static(uploadDir));
+  // Serve uploaded files
+  app.use('/uploads', express.static('uploads'));
 
   // Add API prefix middleware to ensure all API routes are handled correctly
   app.use('/api', (req, res, next) => {
@@ -59,12 +59,18 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ message: "Failed to upload file" });
       }
 
-      // Get download URL for the file
-      const { ok: urlOk, value: fileUrl } = await client.getDownloadUrl(filename);
+      // Generate a unique local filename
+      const localPath = path.join('uploads', filename);
 
-      if (!urlOk) {
-        return res.status(500).json({ message: "Failed to generate file URL" });
+      // Download the file locally
+      const { ok: downloadOk } = await client.downloadToFilename(filename, localPath);
+      if (!downloadOk) {
+        return res.status(500).json({ message: "Failed to process file" });
       }
+
+      // Create URL for the downloaded file
+      const fileUrl = `/uploads/${filename}`;
+
 
       // Store document metadata in database with signed URL
       const [document] = await db.insert(documents).values({
