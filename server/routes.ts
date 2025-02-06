@@ -59,13 +59,24 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ message: "Failed to upload file" });
       }
 
-      // Download file content
+      // Download file content as base64
       const { ok: downloadOk, value: fileContent } = await client.downloadAsText(filename);
       if (!downloadOk) {
         return res.status(500).json({ message: "Failed to retrieve file" });
       }
 
-      const fileUrl = `/api/documents/${filename}`;
+      // Convert base64 to binary buffer
+      const fileBuffer = Buffer.from(fileContent, 'base64');
+      
+      // Create local file with binary content
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      const localPath = path.join(uploadDir, filename);
+      fs.writeFileSync(localPath, fileBuffer);
+
+      const fileUrl = `/uploads/${filename}`;
 
 
       // Store document metadata in database with signed URL
