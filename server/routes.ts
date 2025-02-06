@@ -59,11 +59,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ message: "Failed to upload file" });
       }
 
-      // Get download URL for the file
-      const { ok: urlOk, value: fileUrl } = await client.getDownloadUrl(filename);
-      if (!urlOk) {
-        return res.status(500).json({ message: "Failed to generate file URL" });
+      // Download file content
+      const { ok: downloadOk, value: fileContent } = await client.downloadAsText(filename);
+      if (!downloadOk) {
+        return res.status(500).json({ message: "Failed to retrieve file" });
       }
+
+      const fileUrl = `/api/documents/${filename}`;
 
 
       // Store document metadata in database with signed URL
