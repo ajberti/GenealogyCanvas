@@ -30,8 +30,8 @@ const upload = multer({
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
 
-  // Serve uploaded files
-  app.use('/uploads', express.static(uploadDir));
+  // Serve uploaded files - Removed as we use object storage now.
+  //app.use('/uploads', express.static(uploadDir));
 
   // Add API prefix middleware to ensure all API routes are handled correctly
   app.use('/api', (req, res, next) => {
@@ -51,7 +51,7 @@ export function registerRoutes(app: Express): Server {
       // Generate unique filename
       const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
       const filename = `${uniqueSuffix}-${req.file.originalname}`;
-      
+
       // Upload to Object Storage
       const { ok, error } = await client.uploadFromBuffer(filename, req.file.buffer);
       if (!ok) {
