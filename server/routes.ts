@@ -8,33 +8,12 @@ import path from "path";
 import fs from "fs";
 import express from 'express';
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+import { Client } from '@replit/object-storage';
 
-// Helper function to get the base URL
-function getBaseUrl(req: express.Request): string {
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const host = req.headers['x-forwarded-host'] || req.get('host');
-  return `${protocol}://${host}`;
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  }
-});
+const client = new Client();
 
 const upload = multer({ 
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
@@ -69,11 +48,27 @@ export function registerRoutes(app: Express): Server {
 
       const { familyMemberId, title, documentType, description } = req.body;
 
-      // Create the full file URL with base URL
-      const baseUrl = getBaseUrl(req);
-      const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+      // Generate unique filename
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      const filename = `${uniqueSuffix}-${req.file.originalname}`;
+      
+      // Upload to Object Storage
+      const { ok, error } = await client.uploadFromBuffer(filename, req.file.buffer);
+      if (!ok) {
+        console.error('Error uploading to Object Storage:', error);
+        return res.status(500).json({ message: "Failed to upload file" });
+      }
 
-      // Store document metadata in database with full URL
+      // Get signed URL that expires in 7 days
+      const { ok: urlOk, value: fileUrl } = await client.getSignedUrl(filename, {
+        expiresIn: 7 * 24 * 60 * 60 // 7 days in seconds
+      });
+
+      if (!urlOk) {
+        return res.status(500).json({ message: "Failed to generate file URL" });
+      }
+
+      // Store document metadata in database with signed URL
       const [document] = await db.insert(documents).values({
         familyMemberId: parseInt(familyMemberId),
         title,
@@ -106,14 +101,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      // Extract the filename from the full URL
-      const fileUrl = new URL(document.fileUrl);
-      const filename = path.basename(fileUrl.pathname);
-      const filePath = path.join(uploadDir, filename);
-
-      // Delete the physical file
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Extract the filename from the URL
+      const filename = document.fileUrl.split('/').pop()?.split('?')[0];
+      if (filename) {
+        // Delete from Object Storage
+        const { ok, error } = await client.delete(filename);
+        if (!ok) {
+          console.error('Error deleting from Object Storage:', error);
+        }
       }
 
       // Delete from database
