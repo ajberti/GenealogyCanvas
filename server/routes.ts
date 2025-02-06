@@ -59,10 +59,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ message: "Failed to upload file" });
       }
 
-      // Get signed URL that expires in 7 days
-      const { ok: urlOk, value: fileUrl } = await client.getSignedUrl(filename, {
-        expiresIn: 7 * 24 * 60 * 60 // 7 days in seconds
-      });
+      // Get URL for the uploaded file
+      const { ok: urlOk, value: fileUrl } = await client.getUrl(filename);
 
       if (!urlOk) {
         return res.status(500).json({ message: "Failed to generate file URL" });
