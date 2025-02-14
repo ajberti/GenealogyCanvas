@@ -30,8 +30,36 @@ const upload = multer({
 export function registerRoutes(app: Express): Server {
   const httpServer = createServer(app);
 
-  // Serve uploaded files
-  app.use('/uploads', express.static('uploads'));
+  // Serve files from Object Storage
+  app.get('/uploads/:filename', async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const { ok, value: fileContent } = await client.downloadAsText(filename);
+      
+      if (!ok) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Convert base64 to buffer
+      const buffer = Buffer.from(fileContent, 'base64');
+      
+      // Set content type based on file extension
+      const ext = path.extname(filename).toLowerCase();
+      const contentTypes: Record<string, string> = {
+        '.pdf': 'application/pdf',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif'
+      };
+      
+      res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+      res.send(buffer);
+    } catch (error) {
+      console.error('Error serving file:', error);
+      res.status(500).json({ message: "Error serving file" });
+    }
+  });
 
   // Add API prefix middleware to ensure all API routes are handled correctly
   app.use('/api', (req, res, next) => {
@@ -68,14 +96,6 @@ export function registerRoutes(app: Express): Server {
       // Convert base64 to binary buffer
       const fileBuffer = Buffer.from(fileContent, 'base64');
       
-      // Create local file with binary content
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      const localPath = path.join(uploadDir, filename);
-      fs.writeFileSync(localPath, fileBuffer);
-
       const fileUrl = `/uploads/${filename}`;
 
 
