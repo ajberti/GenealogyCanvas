@@ -24,7 +24,7 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
 
     // Set fixed dimensions for the tree
     const width = 1200; // Fixed width for the SVG
-    const height = 800; // Fixed height for the SVG
+    const height = 1200; // Fixed height for the SVG
 
     // Clear previous svg
     d3.select(svgRef.current).selectAll("*").remove();
