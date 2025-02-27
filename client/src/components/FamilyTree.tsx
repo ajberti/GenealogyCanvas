@@ -4,6 +4,7 @@ import type { TreeNode, FamilyMember } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
 
 interface FamilyTreeProps {
   members: FamilyMember[];
@@ -15,6 +16,11 @@ interface D3TreeNode extends d3.HierarchyNode<TreeNode> {
   x: number;
   y: number;
 }
+
+const formatDate = (date: string | undefined) => {
+  if (!date) return '';
+  return format(new Date(date), 'yyyy');
+};
 
 export default function FamilyTree({ members, onSelectMember, isLoading }: FamilyTreeProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -127,24 +133,55 @@ export default function FamilyTree({ members, onSelectMember, isLoading }: Famil
       .attr("r", 5)
       .attr("fill", "hsl(25, 40%, 35%)");
 
-    nodes.append("text")
+    // Add text elements for name and dates
+    const nodeTexts = nodes.append("g")
+      .attr("transform", "translate(-40, 0)");
+
+    // Add name text
+    nodeTexts.append("text")
       .attr("dy", "1.5em")
-      .attr("x", -40)
       .attr("text-anchor", "middle")
       .text((d: D3TreeNode) => `${d.data.firstName} ${d.data.lastName}`)
       .attr("class", "text-sm font-serif");
+
+    // Add dates text
+    nodeTexts.append("text")
+      .attr("dy", "3em")
+      .attr("text-anchor", "middle")
+      .attr("class", "text-xs text-muted-foreground")
+      .text((d: D3TreeNode) => {
+        const birth = formatDate(d.data.birthDate);
+        const death = formatDate(d.data.deathDate);
+        return death ? `${birth} - ${death}` : birth ? `b. ${birth}` : '';
+      });
 
     // Style spouse nodes
     spouseNodes.append("circle")
       .attr("r", 5)
       .attr("fill", "hsl(25, 40%, 35%)");
 
-    spouseNodes.append("text")
+    // Add text elements for spouse name and dates
+    const spouseTexts = spouseNodes.append("g")
+      .attr("transform", "translate(40, 0)");
+
+    // Add spouse name text
+    spouseTexts.append("text")
       .attr("dy", "1.5em")
-      .attr("x", 40)
       .attr("text-anchor", "middle")
       .text((d: D3TreeNode) => `${d.data.spouse?.firstName} ${d.data.spouse?.lastName}`)
       .attr("class", "text-sm font-serif");
+
+    // Add spouse dates text
+    spouseTexts.append("text")
+      .attr("dy", "3em")
+      .attr("text-anchor", "middle")
+      .attr("class", "text-xs text-muted-foreground")
+      .text((d: D3TreeNode) => {
+        if (!d.data.spouse) return '';
+        const birth = formatDate(d.data.spouse.birthDate);
+        const death = formatDate(d.data.spouse.deathDate);
+        return death ? `${birth} - ${death}` : birth ? `b. ${birth}` : '';
+      });
 
     // Add click handlers
     nodes.on("click", (_: PointerEvent, d: D3TreeNode) => {
